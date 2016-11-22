@@ -31,11 +31,6 @@ AC_CHECK_HEADER(linux/fs.h, [],
 AC_CHECK_HEADER(linux/blkzoned.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/blkzoned.h])])
 
-ACX_PTHREAD
-LIBS="$PTHREAD_LIBS $LIBS"
-CFLAGS="$CFLAGS $PTHREAD_CFLAGS"
-CC="$PTHREAD_CC"
-
 AC_CONFIG_FILES([
 	Makefile
 	man/Makefile
