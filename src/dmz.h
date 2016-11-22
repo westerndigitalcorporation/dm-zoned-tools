@@ -120,7 +120,7 @@ struct dm_zoned_map {
 /*
  * Number of sequential zones reserved for reclaim.
  */
-#define DMZ_NR_RESERVED		1
+#define DMZ_NR_RESERVED		16
 
 /*
  * Device flags.
