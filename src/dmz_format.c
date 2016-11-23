@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <asm/byteorder.h>
@@ -51,6 +52,7 @@ static int dmz_write_super(struct dmz_dev *dev)
 
 	sb->sb_block = __cpu_to_le64(dev->sb_block);
 	sb->nr_meta_blocks = __cpu_to_le32(dev->nr_meta_blocks);
+	sb->nr_reserved_seq = __cpu_to_le32(dev->nr_reserved_seq);
 	sb->nr_chunks = __cpu_to_le32(dev->nr_chunks);
 
 	sb->nr_map_blocks = __cpu_to_le32(dev->nr_map_blocks);
@@ -189,25 +191,39 @@ int dmz_format(struct dmz_dev *dev)
 
 	}
 
-	if (nr_zones < 1) {
+	/*
+	 * Randomly writeable zones are mandatory: at least 2
+	 * (one for metadata and one for bufferring random writes).
+	 */
+	if (nr_rnd_zones < 2) {
+		fprintf(stderr,
+			"%s: Not enough random zones found\n",
+			dev->name);
+		return -1;
+	}
+
+	/*
+	 * It does not make sense to have more reserved
+	 * sequential zones than random zones.
+	 */
+	if (dev->nr_reserved_seq > nr_rnd_zones)
+		dev->nr_reserved_seq = nr_rnd_zones - 1;
+
+	if (nr_zones < (dev->nr_reserved_seq + 1)) {
 		fprintf(stderr,
 			"%s: Not enough useable zones found\n",
 			dev->name);
 		return -1;
 	}
 
-	if (!dev->sb_zone) {
-		fprintf(stderr,
-			"%s: No random zone found for metadata\n",
-			dev->name);
-		return -1;
-	}
 
+	assert(dev->sb_zone);
 	dev->sb_block = dmz_sect2blk(dmz_zone_sector(dev->sb_zone));
 
 	/*
-	 * To facilitate addressing, create one bitmap per zone,
-	 * including meta zones and unuseable read-only or offline zones.
+	 * To facilitate addressing of the bitmap blocks, create
+	 * one bitmap per zone, including meta zones and unuseable
+	 * read-only and offline zones.
 	 */
 	dev->zone_nr_bitmap_blocks =
 		dev->zone_nr_blocks >> (DMZ_BLOCK_SHIFT + 3);
@@ -215,18 +231,26 @@ int dmz_format(struct dmz_dev *dev)
 	nr_bitmap_zones = (dev->nr_bitmap_blocks + dev->zone_nr_blocks - 1)
 		/ dev->zone_nr_blocks;
 
-	if (nr_zones <= (nr_bitmap_zones + DMZ_NR_RESERVED)) {
+	if (nr_zones <= (nr_bitmap_zones + dev->nr_reserved_seq)) {
 		fprintf(stderr,
 			"%s: Not enough zones\n",
 			dev->name);
 		return -1;
 	}
 
-	nr_chunks = nr_zones - (nr_bitmap_zones + DMZ_NR_RESERVED);
+	/*
+	 * Not counting the mapping table, the maximum number of chunks
+	 * is the number of useable zones minus the bitmap zones and the
+	 * number of reserved zones.
+	 */
+	nr_chunks = nr_zones - (nr_bitmap_zones + dev->nr_reserved_seq);
+
+	/* Assuming the maximum nuber of chunks, get the mapping table size */
 	nr_map_blocks = nr_chunks / DMZ_MAP_ENTRIES;
 	if (nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		nr_map_blocks++;
 
+	/* And then a first estimate of the number of metadata zones */
 	nr_meta_blocks = 1 + nr_map_blocks + dev->nr_bitmap_blocks;
 	nr_meta_zones = (nr_meta_blocks + dev->zone_nr_blocks - 1)
 		/ dev->zone_nr_blocks;
@@ -241,8 +265,11 @@ int dmz_format(struct dmz_dev *dev)
 		return -1;
 	}
 
-	/* Fixup number of chunks and mapping table size */
-	dev->nr_chunks = nr_zones - (nr_meta_zones + DMZ_NR_RESERVED);
+	/*
+	 * Now, fix the number of chunks and the mapping table size to
+	 * make sure that everything fits on the drive.
+	 */
+	dev->nr_chunks = nr_zones - (nr_meta_zones + dev->nr_reserved_seq);
 	dev->nr_map_blocks = dev->nr_chunks / DMZ_MAP_ENTRIES;
 	if (dev->nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		dev->nr_map_blocks++;
@@ -271,10 +298,13 @@ int dmz_format(struct dmz_dev *dev)
 		printf("    Using %u zone%s for meta-data\n",
 		       dev->nr_meta_zones,
 		       dev->nr_meta_zones > 1 ? "s" : "");
+		printf("    %u sequential zone%s reserved for reclaim\n",
+		       dev->nr_reserved_seq,
+		       dev->nr_reserved_seq > 1 ? "s" : "");
 
 		nr_rnd_zones -= nr_meta_zones;
 		nr_seq_data_zones = nr_zones
-			- (nr_meta_zones + nr_rnd_zones + DMZ_NR_RESERVED);
+			- (nr_meta_zones + nr_rnd_zones + dev->nr_reserved_seq);
 		printf("  %u chunks\n",
 		       dev->nr_chunks);
 		printf("    %u random data zone%s\n",
@@ -287,7 +317,7 @@ int dmz_format(struct dmz_dev *dev)
 	}
 
 	/* Ready to write: first reset all zones */
-	printf("Resetting zones...\n");
+	printf("Resetting sequential zones...\n");
 	if (dmz_reset_zones(dev) < 0)
 		return -1;
 

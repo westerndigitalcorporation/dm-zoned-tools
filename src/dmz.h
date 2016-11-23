@@ -56,27 +56,30 @@
 struct dm_zoned_super {
 
 	/* Magic number */
-	__le32		magic;				/*    4 */
+	__le32		magic;			/*    4 */
 
 	/* Metadata version number */
-	__le32		version;			/*    8 */
+	__le32		version;		/*    8 */
 
 	/* This block number */
-	__le64		sb_block;			/*   16 */
+	__le64		sb_block;		/*   16 */
 
-	/* The number of metadata blocks, including the super block */
-	__le64		nr_meta_blocks;			/*   20 */
+	/* The number of metadata blocks, including this super block */
+	__le64		nr_meta_blocks;		/*   20 */
+
+	/* The number of sequential zones reserved for reclaim */
+	__le32		nr_reserved_seq;	/*   24 */
 
 	/* The number of entries in the mapping table */
-	__le32		nr_chunks;			/*   24 */
+	__le32		nr_chunks;		/*   28 */
 
 	/* The number of blocks used for the chunk mapping table */
-	__le32		nr_map_blocks;			/*   28 */
+	__le32		nr_map_blocks;		/*   32 */
 
 	/* The number of blocks used for the block bitmaps */
-	__le32		nr_bitmap_blocks;		/*   32 */
+	__le32		nr_bitmap_blocks;	/*   36 */
 
-	__u8		reserved[4064];			/* 4096 */
+	__u8		reserved[4060];		/* 4096 */
 
 };
 
@@ -118,9 +121,9 @@ struct dm_zoned_map {
 #define DMZ_MAP_UNMAPPED	UINT_MAX
 
 /*
- * Number of sequential zones reserved for reclaim.
+ * Default number of sequential zones reserved for reclaim.
  */
-#define DMZ_NR_RESERVED		16
+#define DMZ_NR_RESERVED_SEQ	16
 
 /*
  * Device flags.
@@ -134,9 +137,9 @@ struct dm_zoned_map {
  * Operations.
  */
 enum {
-	DMZ_FORMAT = 1,
-	DMZ_CHECK,
-	DMZ_REPAIR,
+	DMZ_OP_FORMAT = 1,
+	DMZ_OP_CHECK,
+	DMZ_OP_REPAIR,
 };
 
 /*
@@ -147,8 +150,8 @@ typedef struct dmz_dev {
 	/* Device file path and basename */
 	char		*path;
 	char		*name;
-	unsigned int	flags;
 	int		op;
+	unsigned int	flags;
 
 	/* Device info */
 	__u64		capacity;
@@ -156,6 +159,7 @@ typedef struct dmz_dev {
 	unsigned int	nr_zones;
 	unsigned int	nr_meta_zones;
 	unsigned int	nr_meta_blocks;
+	unsigned int	nr_reserved_seq;
 	unsigned int	nr_chunks;
 
 	struct blk_zone	*zones;
