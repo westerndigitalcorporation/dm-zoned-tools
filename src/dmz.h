@@ -56,32 +56,36 @@
 struct dm_zoned_super {
 
 	/* Magic number */
-	__le32		magic;			/*    4 */
+	__le32		magic;			/*   4 */
 
 	/* Metadata version number */
-	__le32		version;		/*    8 */
+	__le32		version;		/*   8 */
+
+	/* Generation number */
+	__le64		gen;			/*  16 */
 
 	/* This block number */
-	__le64		sb_block;		/*   16 */
+	__le64		sb_block;		/*  24 */
 
 	/* The number of metadata blocks, including this super block */
-	__le64		nr_meta_blocks;		/*   20 */
+	__le64		nr_meta_blocks;		/*  32 */
 
 	/* The number of sequential zones reserved for reclaim */
-	__le32		nr_reserved_seq;	/*   24 */
+	__le32		nr_reserved_seq;	/*  36 */
 
 	/* The number of entries in the mapping table */
-	__le32		nr_chunks;		/*   28 */
+	__le32		nr_chunks;		/*  40 */
 
 	/* The number of blocks used for the chunk mapping table */
-	__le32		nr_map_blocks;		/*   32 */
+	__le32		nr_map_blocks;		/*  44 */
 
 	/* The number of blocks used for the block bitmaps */
-	__le32		nr_bitmap_blocks;	/*   36 */
+	__le32		nr_bitmap_blocks;	/*  48 */
 
-	__u8		reserved[4060];		/* 4096 */
+	/* Padding to full 512B sector */
+	__u8		reserved[464];		/* 512 */
 
-};
+} __attribute__ ((packed));
 
 /*
  * Chunk mapping entry: entries are indexed by chunk number
@@ -93,7 +97,7 @@ struct dm_zoned_super {
 struct dm_zoned_map {
 	__le32		dzone_id;
 	__le32		bzone_id;
-};
+} __attribute__ ((packed));
 
 /*
  * dm-zoned creates 4KB block size devices, always.

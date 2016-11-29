@@ -30,13 +30,15 @@
 /*
  * Determine metadata format and initialize meta zones.
  */
-static int dmz_write_super(struct dmz_dev *dev)
+static int dmz_write_super(struct dmz_dev *dev,
+			   unsigned long long offset)
 {
+	unsigned long long sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
 	char *buf;
 	int ret;
 
-	printf("Writing super block...\n");
+	printf("  Writing super block\n");
 
 	buf = malloc(DMZ_BLOCK_SIZE);
 	if (!buf) {
@@ -50,7 +52,12 @@ static int dmz_write_super(struct dmz_dev *dev)
 	sb->magic = __cpu_to_le32(DMZ_MAGIC);
 	sb->version = __cpu_to_le32(DMZ_META_VER);
 
-	sb->sb_block = __cpu_to_le64(dev->sb_block);
+	if (offset)
+		sb->gen= __cpu_to_le64(0);
+	else
+		sb->gen= __cpu_to_le64(1);
+
+	sb->sb_block = __cpu_to_le64(sb_block);
 	sb->nr_meta_blocks = __cpu_to_le32(dev->nr_meta_blocks);
 	sb->nr_reserved_seq = __cpu_to_le32(dev->nr_reserved_seq);
 	sb->nr_chunks = __cpu_to_le32(dev->nr_chunks);
@@ -58,26 +65,28 @@ static int dmz_write_super(struct dmz_dev *dev)
 	sb->nr_map_blocks = __cpu_to_le32(dev->nr_map_blocks);
 	sb->nr_bitmap_blocks = __cpu_to_le32(dev->nr_bitmap_blocks);
 
-	ret = dmz_write_block(dev, dev->sb_block, buf);
+	ret = dmz_write_block(dev, sb_block, buf);
 	if (ret < 0)
 		fprintf(stderr,
 			"%s: Write super block at block %llu failed\n",
 			dev->name,
-			dev->sb_block);
+			sb_block);
 
 	free(buf);
 
 	return ret;
 }
 
-static int dmz_write_mapping(struct dmz_dev *dev)
+static int dmz_write_mapping(struct dmz_dev *dev,
+			     unsigned long long offset)
 {
+	unsigned long long map_block;
 	struct dm_zoned_map *dmap;
 	unsigned int i;
 	char *buf;
 	int ret = -1;
 
-	printf("Writing mapping table...\n");
+	printf("  Writing mapping table\n");
 
 	/* Setup "all unmapped" mapping block */
 	buf = malloc(DMZ_BLOCK_SIZE);
@@ -93,13 +102,14 @@ static int dmz_write_mapping(struct dmz_dev *dev)
 	}
 
 	/* Write mapping table */
+	map_block = offset + dev->map_block;
 	for (i = 0; i < dev->nr_map_blocks; i++) {
-		ret = dmz_write_block(dev, dev->map_block + i, buf);
+		ret = dmz_write_block(dev, map_block + i, buf);
 		if (ret < 0) {
 			fprintf(stderr,
 				"%s: Write mapping block %llu failed\n",
 				dev->name,
-				dev->bitmap_block + i);
+				map_block + i);
 			break;
 		}
 	}
@@ -109,13 +119,15 @@ static int dmz_write_mapping(struct dmz_dev *dev)
 	return ret;
 }
 
-static int dmz_write_bitmap(struct dmz_dev *dev)
+static int dmz_write_bitmap(struct dmz_dev *dev,
+			    unsigned long long offset)
 {
+	unsigned long long bitmap_block;
 	unsigned int i;
 	char *buf;
 	int ret = -1;
 
-	printf("Writing bitmap blocks...\n");
+	printf("  Writing bitmap blocks\n");
 
 	buf = malloc(DMZ_BLOCK_SIZE);
 	if (!buf) {
@@ -125,13 +137,14 @@ static int dmz_write_bitmap(struct dmz_dev *dev)
 	memset(buf, 0, DMZ_BLOCK_SIZE);
 
 	/* Clear bitmap blocks */
+	bitmap_block = offset + dev->bitmap_block;
 	for (i = 0; i < dev->nr_bitmap_blocks; i++) {
-		ret = dmz_write_block(dev, dev->bitmap_block + i, buf);
+		ret = dmz_write_block(dev, bitmap_block + i, buf);
 		if (ret < 0) {
 			fprintf(stderr,
 				"%s: Write bitmap block %llu failed\n",
 				dev->name,
-				dev->bitmap_block + i);
+				bitmap_block + i);
 			break;
 		}
 	}
@@ -139,6 +152,25 @@ static int dmz_write_bitmap(struct dmz_dev *dev)
 	free(buf);
 
 	return ret;
+}
+
+static int dmz_write_meta(struct dmz_dev *dev,
+			  unsigned long long offset)
+{
+
+	/* Write mapping table */
+	if (dmz_write_mapping(dev, offset) < 0)
+		return -1;
+
+	/* Write bitmap blocks */
+	if (dmz_write_bitmap(dev, offset) < 0)
+		return -1;
+
+	/* Write super block */
+	if (dmz_write_super(dev, offset) < 0)
+		return -1;
+
+	return 0;
 }
 
 /*
@@ -151,6 +183,7 @@ int dmz_format(struct dmz_dev *dev)
 	unsigned int i, last_meta_zone = 0;
 	unsigned int nr_meta_blocks, nr_map_blocks;
 	unsigned int nr_chunks, nr_meta_zones;
+	unsigned int total_nr_meta_zones;
 	unsigned int nr_bitmap_zones;
 	unsigned int nr_zones = 0;
 	unsigned int nr_rnd_zones = 0;
@@ -192,10 +225,10 @@ int dmz_format(struct dmz_dev *dev)
 	}
 
 	/*
-	 * Randomly writeable zones are mandatory: at least 2
-	 * (one for metadata and one for bufferring random writes).
+	 * Randomly writeable zones are mandatory: at least 3
+	 * (two for metadata and one for bufferring random writes).
 	 */
-	if (nr_rnd_zones < 2) {
+	if (nr_rnd_zones < 3) {
 		fprintf(stderr,
 			"%s: Not enough random zones found\n",
 			dev->name);
@@ -250,17 +283,21 @@ int dmz_format(struct dmz_dev *dev)
 	if (nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		nr_map_blocks++;
 
-	/* And then a first estimate of the number of metadata zones */
+	/*
+	 * And then a first estimate of the number of metadata zones
+	 * (we need 2 sets of metadata).
+	 */
 	nr_meta_blocks = 1 + nr_map_blocks + dev->nr_bitmap_blocks;
-	nr_meta_zones = (nr_meta_blocks + dev->zone_nr_blocks - 1)
-		/ dev->zone_nr_blocks;
+	nr_meta_zones = ((nr_meta_blocks + dev->zone_nr_blocks - 1)
+			 / dev->zone_nr_blocks);
+	total_nr_meta_zones = nr_meta_zones << 1;
 
-	if (nr_meta_zones > nr_rnd_zones) {
+	if (total_nr_meta_zones > nr_rnd_zones) {
 		fprintf(stderr,
 			"%s: Insufficient number of random zones "
 			"(need %u, have %u)\n",
 			dev->name,
-			nr_meta_zones,
+			total_nr_meta_zones,
 			nr_rnd_zones);
 		return -1;
 	}
@@ -269,7 +306,7 @@ int dmz_format(struct dmz_dev *dev)
 	 * Now, fix the number of chunks and the mapping table size to
 	 * make sure that everything fits on the drive.
 	 */
-	dev->nr_chunks = nr_zones - (nr_meta_zones + dev->nr_reserved_seq);
+	dev->nr_chunks = nr_zones - (total_nr_meta_zones + dev->nr_reserved_seq);
 	dev->nr_map_blocks = dev->nr_chunks / DMZ_MAP_ENTRIES;
 	if (dev->nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		dev->nr_map_blocks++;
@@ -277,8 +314,9 @@ int dmz_format(struct dmz_dev *dev)
 	dev->bitmap_block = dev->map_block + dev->nr_map_blocks;
 
 	dev->nr_meta_blocks = 1 + dev->nr_map_blocks + dev->nr_bitmap_blocks;
-	dev->nr_meta_zones = (dev->nr_meta_blocks + dev->zone_nr_blocks - 1)
-		/ dev->zone_nr_blocks;
+	dev->nr_meta_zones = ((dev->nr_meta_blocks + dev->zone_nr_blocks - 1)
+			 / dev->zone_nr_blocks);
+	total_nr_meta_zones = dev->nr_meta_zones << 1;
 
 	if (dev->flags & DMZ_VERBOSE) {
 
@@ -287,24 +325,19 @@ int dmz_format(struct dmz_dev *dev)
 		       dev->nr_meta_blocks,
 		       dev->sb_block,
 		       dmz_zone_id(dev, dev->sb_zone));
-		printf("    Super block at block %llu\n",
-		       dev->sb_block);
-		printf("    %u chunk mapping table blocks from block %llu\n",
-		       dev->nr_map_blocks,
-		       dev->map_block);
-		printf("    %u bitmap blocks from block %llu\n",
-		       dev->nr_bitmap_blocks,
-		       dev->bitmap_block);
-		printf("    Using %u zone%s for meta-data\n",
-		       dev->nr_meta_zones,
-		       dev->nr_meta_zones > 1 ? "s" : "");
-		printf("    %u sequential zone%s reserved for reclaim\n",
-		       dev->nr_reserved_seq,
-		       dev->nr_reserved_seq > 1 ? "s" : "");
+		printf("    Super block at block %llu and %llu\n",
+		       dev->sb_block,
+		       dev->sb_block + (dev->nr_meta_zones * dev->zone_nr_blocks));
+		printf("    %u chunk mapping table blocks\n",
+		       dev->nr_map_blocks);
+		printf("    %u bitmap blocks\n",
+		       dev->nr_bitmap_blocks);
+		printf("    Using %u zones for meta-data\n",
+		       total_nr_meta_zones);
 
-		nr_rnd_zones -= nr_meta_zones;
+		nr_rnd_zones -= total_nr_meta_zones;
 		nr_seq_data_zones = nr_zones
-			- (nr_meta_zones + nr_rnd_zones + dev->nr_reserved_seq);
+			- (total_nr_meta_zones + nr_rnd_zones + dev->nr_reserved_seq);
 		printf("  %u chunks\n",
 		       dev->nr_chunks);
 		printf("    %u random data zone%s\n",
@@ -313,28 +346,29 @@ int dmz_format(struct dmz_dev *dev)
 		printf("    %u sequential data zone%s\n",
 		       nr_seq_data_zones,
 		       nr_seq_data_zones > 1 ? "s" : "");
+		printf("  %u sequential zone%s reserved for reclaim\n",
+		       dev->nr_reserved_seq,
+		       dev->nr_reserved_seq > 1 ? "s" : "");
 
 	}
 
 	/* Ready to write: first reset all zones */
-	printf("Resetting sequential zones...\n");
+	printf("Resetting sequential zones\n");
 	if (dmz_reset_zones(dev) < 0)
 		return -1;
 
-	/* Write mapping table */
-	if (dmz_write_mapping(dev) < 0)
+	/* Write primary metadata set */
+	printf("Writing primary metadata set\n");
+	if (dmz_write_meta(dev, 0) < 0)
 		return -1;
 
-	/* Write bitmap blocks */
-	if (dmz_write_bitmap(dev) < 0)
-		return -1;
-
-	/* Write super block */
-	if (dmz_write_super(dev) < 0)
+	/* Write secondary metadata set */
+	printf("Writing secondary metadata set\n");
+	if (dmz_write_meta(dev, dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
 		return -1;
 
 	/* Sync */
-	printf("Syncing disk...\n");
+	printf("Syncing disk\n");
 	if (fsync(dev->fd) < 0) {
 		fprintf(stderr,
 			"%s: fsync failed %d (%s)\n",
