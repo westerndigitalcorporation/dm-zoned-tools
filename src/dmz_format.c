@@ -13,8 +13,6 @@
  * Authors: Damien Le Moal (damien.lemoal@wdc.com)
  */
 
-/***** Including files *****/
-
 #include "dmz.h"
 
 #include <stdio.h>
@@ -35,6 +33,8 @@ static int dmz_write_super(struct dmz_dev *dev,
 {
 	unsigned long long sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
+	__u64 gen = offset ? 0 : 1;
+	__u32 crc;
 	char *buf;
 	int ret;
 
@@ -52,10 +52,7 @@ static int dmz_write_super(struct dmz_dev *dev,
 	sb->magic = __cpu_to_le32(DMZ_MAGIC);
 	sb->version = __cpu_to_le32(DMZ_META_VER);
 
-	if (offset)
-		sb->gen= __cpu_to_le64(0);
-	else
-		sb->gen= __cpu_to_le64(1);
+	sb->gen = __cpu_to_le64(gen);
 
 	sb->sb_block = __cpu_to_le64(sb_block);
 	sb->nr_meta_blocks = __cpu_to_le32(dev->nr_meta_blocks);
@@ -64,6 +61,9 @@ static int dmz_write_super(struct dmz_dev *dev,
 
 	sb->nr_map_blocks = __cpu_to_le32(dev->nr_map_blocks);
 	sb->nr_bitmap_blocks = __cpu_to_le32(dev->nr_bitmap_blocks);
+
+	crc = dmz_crc32(gen, sb, DMZ_BLOCK_SIZE);
+	sb->crc = __cpu_to_le32(crc);
 
 	ret = dmz_write_block(dev, sb_block, buf);
 	if (ret < 0)

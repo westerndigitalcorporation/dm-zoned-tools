@@ -82,8 +82,11 @@ struct dm_zoned_super {
 	/* The number of blocks used for the block bitmaps */
 	__le32		nr_bitmap_blocks;	/*  48 */
 
+	/* Checksum */
+	__le32		crc;			/*  52 */
+
 	/* Padding to full 512B sector */
-	__u8		reserved[464];		/* 512 */
+	__u8		reserved[460];		/* 512 */
 
 } __attribute__ ((packed));
 
@@ -249,14 +252,16 @@ dmz_zone_cond_str(struct blk_zone *zone)
 #define dmz_zone_need_reset(z)	(int)(z)->reset
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
-int dmz_open_dev(struct dmz_dev *dev);
-void dmz_close_dev(struct dmz_dev *dev);
-int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
-int dmz_reset_zones(struct dmz_dev *dev);
-int dmz_write_block(struct dmz_dev *dev, __u64 block, char *buf);
+extern int dmz_open_dev(struct dmz_dev *dev);
+extern void dmz_close_dev(struct dmz_dev *dev);
+extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
+extern int dmz_reset_zones(struct dmz_dev *dev);
+extern int dmz_write_block(struct dmz_dev *dev, __u64 block, char *buf);
 
-int dmz_format(struct dmz_dev *dev);
-int dmz_check(struct dmz_dev *dev);
-int dmz_repair(struct dmz_dev *dev);
+extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
+
+extern int dmz_format(struct dmz_dev *dev);
+extern int dmz_check(struct dmz_dev *dev);
+extern int dmz_repair(struct dmz_dev *dev);
 
 #endif /* __DMZ_H__ */

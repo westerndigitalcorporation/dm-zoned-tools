@@ -13,8 +13,6 @@
  * Authors: Damien Le Moal (damien.lemoal@wdc.com)
  */
 
-/***** Including files *****/
-
 #include "dmz.h"
 
 #include <stdio.h>
