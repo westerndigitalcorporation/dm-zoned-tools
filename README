@@ -1,7 +1,10 @@
 Copyright (C) 2016, Western Digital.
 
-dm-zoned
-========
+I. Introduction
+===============
+
+I.1. dm-zoned
+-------------
 
 The dm-zoned device mapper provides transparent write access to zoned block
 devices (ZBC and ZAC compliant devices). It hides to the device user (a file
@@ -25,8 +28,8 @@ dm-zoned memory usage per disk instance is at most 4.5 MB and as little as 5
 zones will be used internally for storing metadata and performaing reclaim
 operations.
 
-dm-zoned-tools
-==============
+I.2 dm-zoned-tools
+------------------
 
 dm-zoned backend devices can be formatted and checked using the dmzadm utility.
 
@@ -44,8 +47,22 @@ Format options:
 	          for reclaim. The minimum is 1 and the
 		  default is 16
 
-Algorithm
-=========
+I.3. License
+------------
+
+dm-zoned-tools is distributed under the terms of the the terms of the GNU
+General Public License version 3, or any later version. A copy of version 3 of
+this license can be found in the COPYING.GPL file.
+
+dm-zoned-tools and all its applications are distributed "as is", without
+technical support, and WITHOUT ANY WARRANTY, without even the implied warranty
+of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Along with dm-zoned-tools, you should have received a copy of the GNU 
+General Public License version 3. If not, see <http://www.gnu.org/licenses/>.
+
+II. Algorithm
+=============
 
 dm-zoned implements an on-disk buffering scheme to handle non-sequential write
 accesses to a zoned device sequential zones. Conventional zones are used for
@@ -120,8 +137,8 @@ and updated and normal operation resumed. This only temporarily delays write and
 discard requests. Read requests can be processed while metadata logging is
 executed.
 
-Usage
-=====
+IV. Usage
+=========
 
 A zoned block device must first be formatted using the dmzadm tool. This will
 analyze the device zone configuration, determine where to place the metadata
@@ -142,8 +159,8 @@ Options:
                      reclaiming random zones if the percentage of
                      free random data zones falls below <perc>.
 
-Example scripts
-===============
+V. Example scripts
+==================
 
 [[
 #!/bin/sh
