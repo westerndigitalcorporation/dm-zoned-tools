@@ -257,11 +257,11 @@ extern void dmz_close_dev(struct dmz_dev *dev);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
 extern int dmz_write_block(struct dmz_dev *dev, __u64 block, char *buf);
+extern int dmz_read_block(struct dmz_dev *dev, __u64 block, char *buf);
 
 extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
 extern int dmz_format(struct dmz_dev *dev);
-extern int dmz_check(struct dmz_dev *dev);
-extern int dmz_repair(struct dmz_dev *dev);
+extern int dmz_check(struct dmz_dev *dev, int repair);
 
 #endif /* __DMZ_H__ */

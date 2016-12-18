@@ -163,11 +163,11 @@ int main(int argc, char **argv)
 		break;
 
 	case DMZ_OP_CHECK:
-		ret = dmz_check(&dev);
+		ret = dmz_check(&dev, 0);
 		break;
 
 	case DMZ_OP_REPAIR:
-		ret = dmz_repair(&dev);
+		ret = dmz_check(&dev, 1);
 		break;
 
 	default:

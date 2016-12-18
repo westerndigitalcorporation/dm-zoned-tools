@@ -278,7 +278,7 @@ int dmz_format(struct dmz_dev *dev)
 	 */
 	nr_chunks = nr_zones - (nr_bitmap_zones + dev->nr_reserved_seq);
 
-	/* Assuming the maximum nuber of chunks, get the mapping table size */
+	/* Assuming the maximum number of chunks, get the mapping table size */
 	nr_map_blocks = nr_chunks / DMZ_MAP_ENTRIES;
 	if (nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		nr_map_blocks++;

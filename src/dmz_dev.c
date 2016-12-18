@@ -481,3 +481,23 @@ int dmz_write_block(struct dmz_dev *dev, __u64 block, char *buf)
 
 	return 0;
 }
+
+int dmz_read_block(struct dmz_dev *dev, __u64 block, char *buf)
+{
+	ssize_t ret;
+
+	ret = pread(dev->fd,
+		     buf,
+		     DMZ_BLOCK_SIZE, block << DMZ_BLOCK_SHIFT);
+
+	if (ret != DMZ_BLOCK_SIZE) {
+		fprintf(stderr,
+			"%s: Read block %llu failed %d (%s)\n",
+			dev->name,
+			block,
+			errno, strerror(errno));
+		return -1;
+	}
+
+	return 0;
+}
