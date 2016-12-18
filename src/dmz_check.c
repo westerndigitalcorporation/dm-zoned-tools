@@ -334,7 +334,7 @@ static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
 	nr_bitmap_blocks = __le32_to_cpu(sb->nr_bitmap_blocks);
 	zone_nr_bitmap_blocks = dev->zone_nr_blocks >> (DMZ_BLOCK_SHIFT + 3);
 
-	printf("Starting zone bitmap verification at 0x%llx for %u blocks\n", bitmap_block, nr_bitmap_blocks);
+	printf("Starting zone bitmaps verification at 0x%llx for %u blocks\n", bitmap_block, nr_bitmap_blocks);
 
 	/* Again, let's do the check in multiple loops... */
 	
@@ -425,6 +425,13 @@ static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
 			}
 		}
 	}
+
+	printf("Zone bitmaps verification complete\n");
+
+	if(found_error)
+		printf("Found errors in metadata blocks\n");
+	else
+		printf("No errors found in metadata blocks\n");
 
 	return found_error;
 }
