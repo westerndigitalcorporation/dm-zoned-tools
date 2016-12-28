@@ -413,7 +413,7 @@ void dmz_close_dev(struct dmz_dev *dev)
 	if (dev->fd >= 0)
 		close(dev->fd);
 
-	if(dev->zones)
+	if (dev->zones)
 		free(dev->zones);
 }
 

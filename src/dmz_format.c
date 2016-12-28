@@ -28,8 +28,8 @@
 /*
  * Determine metadata format and initialize meta zones.
  */
-static int dmz_write_super(struct dmz_dev *dev,
-			   unsigned long long offset)
+int dmz_write_super(struct dmz_dev *dev,
+		    unsigned long long offset)
 {
 	unsigned long long sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
@@ -38,7 +38,7 @@ static int dmz_write_super(struct dmz_dev *dev,
 	char *buf;
 	int ret;
 
-	printf("  Writing super block\n");
+	printf("  Writing super block");
 
 	buf = malloc(DMZ_BLOCK_SIZE);
 	if (!buf) {
@@ -174,20 +174,20 @@ static int dmz_write_meta(struct dmz_dev *dev,
 }
 
 /*
- * Format a device.
+ * Calculate location of metadata.
  */
-int dmz_format(struct dmz_dev *dev)
+int dmz_calulate_md_loc(struct dmz_dev *dev)
 {
 	struct blk_zone *zone;
-	unsigned int max_nr_meta_zones = 0;
-	unsigned int i, last_meta_zone = 0;
+	unsigned int i = 0;
 	unsigned int nr_meta_blocks, nr_map_blocks;
 	unsigned int nr_chunks, nr_meta_zones;
-	unsigned int total_nr_meta_zones;
 	unsigned int nr_bitmap_zones;
-	unsigned int nr_zones = 0;
-	unsigned int nr_rnd_zones = 0;
-	unsigned int nr_seq_data_zones;
+
+	dev->nr_active_zones = 0;
+	dev->max_nr_meta_zones = 0;
+	dev->last_meta_zone = 0;
+	dev->nr_rnd_zones = 0;
 
 	/* Count useable zones */
 	for (i = 0; i < dev->nr_zones; i++) {
@@ -208,18 +208,18 @@ int dmz_format(struct dmz_dev *dev)
 			continue;
 		}
 
-		nr_zones++;
+		dev->nr_active_zones++;
 
 		if (dmz_zone_rnd(zone)) {
 			if (dev->sb_zone == NULL) {
 				dev->sb_zone = zone;
-				last_meta_zone = i;
-				max_nr_meta_zones = 1;
-			} else if (last_meta_zone == (i - 1)) {
-				last_meta_zone = i;
-				max_nr_meta_zones++;
+				dev->last_meta_zone = i;
+				dev->max_nr_meta_zones = 1;
+			} else if (dev->last_meta_zone == (i - 1)) {
+				dev->last_meta_zone = i;
+				dev->max_nr_meta_zones++;
 			}
-			nr_rnd_zones++;
+			dev->nr_rnd_zones++;
 		}
 
 	}
@@ -228,7 +228,7 @@ int dmz_format(struct dmz_dev *dev)
 	 * Randomly writeable zones are mandatory: at least 3
 	 * (two for metadata and one for bufferring random writes).
 	 */
-	if (nr_rnd_zones < 3) {
+	if (dev->nr_rnd_zones < 3) {
 		fprintf(stderr,
 			"%s: Not enough random zones found\n",
 			dev->name);
@@ -239,10 +239,10 @@ int dmz_format(struct dmz_dev *dev)
 	 * It does not make sense to have more reserved
 	 * sequential zones than random zones.
 	 */
-	if (dev->nr_reserved_seq > nr_rnd_zones)
-		dev->nr_reserved_seq = nr_rnd_zones - 1;
+	if (dev->nr_reserved_seq > dev->nr_rnd_zones)
+		dev->nr_reserved_seq = dev->nr_rnd_zones - 1;
 
-	if (nr_zones < (dev->nr_reserved_seq + 1)) {
+	if (dev->nr_active_zones < (dev->nr_reserved_seq + 1)) {
 		fprintf(stderr,
 			"%s: Not enough useable zones found\n",
 			dev->name);
@@ -264,7 +264,7 @@ int dmz_format(struct dmz_dev *dev)
 	nr_bitmap_zones = (dev->nr_bitmap_blocks + dev->zone_nr_blocks - 1)
 		/ dev->zone_nr_blocks;
 
-	if (nr_zones <= (nr_bitmap_zones + dev->nr_reserved_seq)) {
+	if (dev->nr_active_zones <= (nr_bitmap_zones + dev->nr_reserved_seq)) {
 		fprintf(stderr,
 			"%s: Not enough zones\n",
 			dev->name);
@@ -276,7 +276,8 @@ int dmz_format(struct dmz_dev *dev)
 	 * is the number of useable zones minus the bitmap zones and the
 	 * number of reserved zones.
 	 */
-	nr_chunks = nr_zones - (nr_bitmap_zones + dev->nr_reserved_seq);
+	nr_chunks = dev->nr_active_zones -
+		(nr_bitmap_zones + dev->nr_reserved_seq);
 
 	/* Assuming the maximum number of chunks, get the mapping table size */
 	nr_map_blocks = nr_chunks / DMZ_MAP_ENTRIES;
@@ -290,15 +291,15 @@ int dmz_format(struct dmz_dev *dev)
 	nr_meta_blocks = 1 + nr_map_blocks + dev->nr_bitmap_blocks;
 	nr_meta_zones = ((nr_meta_blocks + dev->zone_nr_blocks - 1)
 			 / dev->zone_nr_blocks);
-	total_nr_meta_zones = nr_meta_zones << 1;
+	dev->total_nr_meta_zones = nr_meta_zones << 1;
 
-	if (total_nr_meta_zones > nr_rnd_zones) {
+	if (dev->total_nr_meta_zones > dev->nr_rnd_zones) {
 		fprintf(stderr,
 			"%s: Insufficient number of random zones "
 			"(need %u, have %u)\n",
 			dev->name,
-			total_nr_meta_zones,
-			nr_rnd_zones);
+			dev->total_nr_meta_zones,
+			dev->nr_rnd_zones);
 		return -1;
 	}
 
@@ -306,7 +307,8 @@ int dmz_format(struct dmz_dev *dev)
 	 * Now, fix the number of chunks and the mapping table size to
 	 * make sure that everything fits on the drive.
 	 */
-	dev->nr_chunks = nr_zones - (total_nr_meta_zones + dev->nr_reserved_seq);
+	dev->nr_chunks = dev->nr_active_zones -
+		(dev->total_nr_meta_zones + dev->nr_reserved_seq);
 	dev->nr_map_blocks = dev->nr_chunks / DMZ_MAP_ENTRIES;
 	if (dev->nr_chunks & DMZ_MAP_ENTRIES_MASK)
 		dev->nr_map_blocks++;
@@ -316,9 +318,23 @@ int dmz_format(struct dmz_dev *dev)
 	dev->nr_meta_blocks = 1 + dev->nr_map_blocks + dev->nr_bitmap_blocks;
 	dev->nr_meta_zones = ((dev->nr_meta_blocks + dev->zone_nr_blocks - 1)
 			 / dev->zone_nr_blocks);
-	total_nr_meta_zones = dev->nr_meta_zones << 1;
+	dev->total_nr_meta_zones = dev->nr_meta_zones << 1;
+
+	return 0;
+
+}
+
+/*
+ * Format a device.
+ */
+int dmz_format(struct dmz_dev *dev)
+{
+	/*First, calculate location of the metadata blocks */
+	if (dmz_calulate_md_loc(dev) < 0)
+		return -1;
 
 	if (dev->flags & DMZ_VERBOSE) {
+		unsigned int nr_seq_data_zones;
 
 		printf("Format:\n");
 		printf("  %u metadata blocks from block %llu (zone %u)\n",
@@ -333,16 +349,17 @@ int dmz_format(struct dmz_dev *dev)
 		printf("    %u bitmap blocks\n",
 		       dev->nr_bitmap_blocks);
 		printf("    Using %u zones for meta-data\n",
-		       total_nr_meta_zones);
+		       dev->total_nr_meta_zones);
 
-		nr_rnd_zones -= total_nr_meta_zones;
-		nr_seq_data_zones = nr_zones
-			- (total_nr_meta_zones + nr_rnd_zones + dev->nr_reserved_seq);
+		dev->nr_rnd_zones -= dev->total_nr_meta_zones;
+		nr_seq_data_zones = dev->nr_active_zones
+			- (dev->total_nr_meta_zones + dev->nr_rnd_zones +
+			dev->nr_reserved_seq);
 		printf("  %u chunks\n",
 		       dev->nr_chunks);
 		printf("    %u random data zone%s\n",
-		       nr_rnd_zones,
-		       nr_rnd_zones > 1 ? "s" : "");
+		       dev->nr_rnd_zones,
+		       dev->nr_rnd_zones > 1 ? "s" : "");
 		printf("    %u sequential data zone%s\n",
 		       nr_seq_data_zones,
 		       nr_seq_data_zones > 1 ? "s" : "");

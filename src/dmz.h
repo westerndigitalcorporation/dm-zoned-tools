@@ -168,6 +168,11 @@ typedef struct dmz_dev {
 	unsigned int	nr_meta_blocks;
 	unsigned int	nr_reserved_seq;
 	unsigned int	nr_chunks;
+	unsigned int	nr_active_zones;
+	unsigned int	max_nr_meta_zones;
+	unsigned int	last_meta_zone;
+	unsigned int	total_nr_meta_zones;
+	unsigned int	nr_rnd_zones;
 
 	struct blk_zone	*zones;
 
@@ -261,7 +266,9 @@ extern int dmz_read_block(struct dmz_dev *dev, __u64 block, char *buf);
 
 extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
+extern int dmz_calulate_md_loc(struct dmz_dev *dev);
 extern int dmz_format(struct dmz_dev *dev);
 extern int dmz_check(struct dmz_dev *dev, int repair);
+extern int dmz_write_super(struct dmz_dev *dev, unsigned long long offset);
 
 #endif /* __DMZ_H__ */

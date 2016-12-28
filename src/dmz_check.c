@@ -36,51 +36,10 @@
 #define DIV_ROUND_UP(n,d)		(((n) + (d) - 1) / (d))
 #define DMZ_MAP_UNMAPPED_LE32		__cpu_to_le32(DMZ_MAP_UNMAPPED)
 
-/* Calculate location of metadata blocks */
-static void calc_dmz_meta_data_loc(struct dmz_dev *dev,
-				   unsigned int *max_nr_meta_zones,
-				   __u32 *nr_active_zones,
-				   unsigned int *last_md_zone_id)
-{
-	struct blk_zone *zone;
-	*last_md_zone_id = 0;
-	*nr_active_zones = 0;
-
-	/* Count useable zones */
-	for (unsigned int i = 0; i < dev->nr_zones; i++) {
-		zone = &dev->zones[i];
-
-		if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
-			printf("%s: Ignoring inactive zone %u\n",
-			       dev->name,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-
-		(*nr_active_zones)++;
-
-		if (dmz_zone_rnd(zone)) {
-			if (dev->sb_zone == NULL) {
-				dev->sb_zone = zone;
-				*last_md_zone_id = i;
-				*max_nr_meta_zones = 1;
-			} else if (*last_md_zone_id == (i - 1)) {
-				*last_md_zone_id = i;
-				(*max_nr_meta_zones)++;
-			}
-		}
-
-	}
-
-	assert(dev->sb_zone);
-	dev->sb_block = dmz_sect2blk(dmz_zone_sector(dev->sb_zone));
-
-}
-
 /* Check the contents of a super block */
-static int check_superblock(struct dmz_dev *dev, __u32 nr_zones,
-			    __u8 *block_buffer, __u64 address,
-			    int print_error)
+static int dmz_check_superblock(struct dmz_dev *dev, __u32 nr_zones,
+				__u8 *block_buffer, __u64 address,
+				int print_error)
 {
 	struct dm_zoned_super *sb;
 	__u32 stored_crc, calculated_crc;
@@ -131,6 +90,7 @@ static int check_superblock(struct dmz_dev *dev, __u32 nr_zones,
 		return -1;
 	}
 
+	/* Let's make sure the internal superblock numbers match */
 	/* Check total number of metadata blocks are expected */
 	__u64 expected_nr_meta_blocks =
 		1 + __le32_to_cpu(sb->nr_map_blocks) +
@@ -146,12 +106,22 @@ static int check_superblock(struct dmz_dev *dev, __u32 nr_zones,
 		return -1;
 	}
 
-	__u32 nr_meta_zones =
-		DIV_ROUND_UP(expected_nr_meta_blocks, dev->zone_nr_blocks);
+	/* Check to make sure number of reserved seq zones makes sense */
+	if (nr_zones < (__le32_to_cpu(sb->nr_reserved_seq) + 1)) {
+		fprintf(stderr,
+			"Super block at 0x%llx failed number of reserved "
+			"sequential zone check, expect less than or equal to %u "
+			"read %u",
+			address, nr_zones - 1,
+			__le32_to_cpu(sb->nr_reserved_seq));
+		return -1;
+	}
+
+	__u32 nr_meta_zones = DIV_ROUND_UP(__le64_to_cpu(sb->nr_meta_blocks),
+		dev->zone_nr_blocks);
 
 	/* Check to make number of chunks is as expected */
-	__u32 expected_nr_chunks =
-		nr_zones - ((nr_meta_zones * 2) +
+	__u32 expected_nr_chunks = nr_zones - ((nr_meta_zones * 2) +
 		__le32_to_cpu(sb->nr_reserved_seq));
 
 	if (__le32_to_cpu(sb->nr_chunks) != expected_nr_chunks) {
@@ -163,7 +133,22 @@ static int check_superblock(struct dmz_dev *dev, __u32 nr_zones,
 			__le32_to_cpu(sb->nr_chunks));
 		return -1;
 	}
-	
+
+	/* Check to make sure we've enough zones */
+	__u32 nr_accnt_for_zones = ((nr_meta_zones * 2) +
+		__le32_to_cpu(sb->nr_reserved_seq) +
+		__le32_to_cpu(sb->nr_chunks));
+
+	if (nr_zones < nr_accnt_for_zones) {
+		fprintf(stderr,
+			"Super block at 0x%llx failed number of accounted "
+			"for zone check, expect less than to equal to %u "
+			"read %u",
+			address, nr_zones,
+			nr_accnt_for_zones);
+		return -1;
+	}
+
 	/* Check to make sure nr_chunks matches nr_map_blocks */
 	__u32 expected_nr_map_blocks =
 		DIV_ROUND_UP(__le32_to_cpu(sb->nr_chunks), DMZ_MAP_ENTRIES);
@@ -201,24 +186,24 @@ static int check_superblock(struct dmz_dev *dev, __u32 nr_zones,
 }
 
 /* Check if the contents of 2 super block matches */
-static int matching_superblock(struct dm_zoned_super *sb_0,
-			       struct dm_zoned_super *sb_1)
+static int dmz_check_matching_superblock(struct dm_zoned_super *sb_0,
+					 struct dm_zoned_super *sb_1)
 {
 	if ((sb_0->nr_meta_blocks == sb_1->nr_meta_blocks) &&
 	(sb_0->nr_reserved_seq == sb_1->nr_reserved_seq) &&
 	(sb_0->nr_chunks == sb_1->nr_chunks) &&
 	(sb_0->nr_map_blocks == sb_1->nr_map_blocks) &&
 	(sb_0->nr_bitmap_blocks == sb_1->nr_bitmap_blocks))
-		return 1;
+		return -1;
 
 	return 0;
 
 }
 
 /* Read in zone bitmaps for a given zone */
-static int read_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
-			    __u64 bitmap_block, size_t zone_nr_bitmap_blocks,
-			    __u8 *buf, __u64 *bitmap_block_address)
+static int dmz_read_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
+				__u64 bitmap_block, size_t zone_nr_bitmap_blocks,
+				__u8 *buf, __u64 *bitmap_block_address)
 {
 	__u64 starting_block = bitmap_block + (zone_id * zone_nr_bitmap_blocks);
 	*bitmap_block_address = starting_block;
@@ -230,7 +215,7 @@ static int read_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
 
 		status = dmz_read_block(dev, block, c_ptr);
 
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr,
 				"Error reading bitmap block at 0x%llx\n",
 				block);
@@ -244,9 +229,9 @@ static int read_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
 }
 
 /* Write out zone bitmaps for a given zone */
-static int write_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
-			    __u64 bitmap_block, size_t zone_nr_bitmap_blocks,
-			    __u8 *buf, __u64 *bitmap_block_address)
+static int dmz_write_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
+				 __u64 bitmap_block, size_t zone_nr_bitmap_blocks,
+				 __u8 *buf, __u64 *bitmap_block_address)
 {
 	__u64 starting_block = bitmap_block + (zone_id * zone_nr_bitmap_blocks);
 	*bitmap_block_address = starting_block;
@@ -258,7 +243,7 @@ static int write_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
 
 		status = dmz_write_block(dev, block, c_ptr);
 
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr,
 				"Error writing bitmap block at 0x%llx\n",
 				block);
@@ -271,10 +256,10 @@ static int write_zone_bitmap(struct dmz_dev *dev, unsigned int zone_id,
 
 }
 
-static int check_zone_mapping_block(struct dmz_dev *dev,
-				    __u64 block_addr,
-				    __u8 *map_zone_entry_bm,
-				    unsigned int bm_size, int repair)
+static int dmz_check_zone_mapping_block(struct dmz_dev *dev,
+					__u64 block_addr,
+					__u8 *map_zone_entry_bm,
+					unsigned int bm_size, int repair)
 {
 	__u8 map_block_buffer[DMZ_BLOCK_SIZE];
 	int found_error = 0;
@@ -282,11 +267,11 @@ static int check_zone_mapping_block(struct dmz_dev *dev,
 
 	status = dmz_read_block(dev, block_addr, (char *)map_block_buffer);
 
-	if (status) {
+	if (status < 0) {
 		fprintf(stderr,
 			"Error reading map block at 0x%llx\n",
 			block_addr);
-		return 1;
+		return -1;
 	}
 
 	/* Lets do mapping check in multiple rounds,
@@ -498,23 +483,20 @@ static int check_zone_mapping_block(struct dmz_dev *dev,
 
 	/* Commit the repaired changes */
 	if (repair) {
-
 		status = dmz_write_block(dev, block_addr, (char *)map_block_buffer);
-		
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr,
 				"Error writing map block at 0x%llx\n", block_addr);
 			found_error = 1;
 		}
-
 	}
 
-	return found_error;
+	return (found_error ? -1 : 0);
 
 }
 
-static int check_zone_mappings(struct dmz_dev *dev, __u64 map_block,
-			      __u32 nr_map_blocks, int repair)
+static int dmz_check_zone_mappings(struct dmz_dev *dev, __u64 map_block,
+				   __u32 nr_map_blocks, int repair)
 {
 	__u8 map_zone_entry_bm[DIV_ROUND_UP(dev->nr_zones, 8)];
 	int found_error = 0;
@@ -529,26 +511,26 @@ static int check_zone_mappings(struct dmz_dev *dev, __u64 map_block,
 
 	for (unsigned int i = 0; i < nr_map_blocks; i++) {
 
-		status = check_zone_mapping_block(dev, map_block + i,
+		status = dmz_check_zone_mapping_block(dev, map_block + i,
 			map_zone_entry_bm, DIV_ROUND_UP(dev->nr_zones, 8),
 			repair);
 
-		if(status)
+		if (status < 0)
 			found_error = 1;
 
 	}
 
 	printf("Mapping table verification complete\n");
 
-	return found_error;
+	return (found_error ? -1 : 0);
 
 }
 
-static int check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
-					    __u64 block_addr,
-					    __u64 bitmap_block,
-					    size_t zone_nr_bitmap_blocks,
-					    int repair)
+static int dmz_check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
+						__u64 block_addr,
+						__u64 bitmap_block,
+						size_t zone_nr_bitmap_blocks,
+						int repair)
 {
 	__u8 map_block_buffer[DMZ_BLOCK_SIZE];
 	int found_error = 0;
@@ -556,10 +538,10 @@ static int check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
 
 	status = dmz_read_block(dev, block_addr, (char *)map_block_buffer);
 
-	if (status) {
+	if (status < 0) {
 		fprintf(stderr, "Error reading map block at 0x%llx\n",
 			block_addr);
-		return 1;
+		return -1;
 	}
 
 	struct dm_zoned_map *dmap;
@@ -582,17 +564,21 @@ static int check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
 		__u64 bzone_bitmap_block_address;
 
 		/* Read in the zone bits */
-		if (read_zone_bitmap(dev, dzone_id, bitmap_block,
+		if (dmz_read_zone_bitmap(dev, dzone_id, bitmap_block,
 			zone_nr_bitmap_blocks,
 			dzone_bitmap_buffer,
-			&dzone_bitmap_block_address))
+			&dzone_bitmap_block_address) < 0) {
+			found_error = 1;
 			continue;
+		}
 
-		if (read_zone_bitmap(dev, bzone_id, bitmap_block,
+		if (dmz_read_zone_bitmap(dev, bzone_id, bitmap_block,
 			zone_nr_bitmap_blocks,
 			bzone_bitmap_buffer,
-			&bzone_bitmap_block_address))
+			&bzone_bitmap_block_address) < 0) {
+			found_error = 1;
 			continue;
+		}
 
 		/* Make sure there are no overlaps */
 		for (unsigned int k = 0; k < zone_nr_bitmap_blocks *
@@ -639,34 +625,34 @@ static int check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
 		/* Commit the repaired changes */
 		if (repair) {
 
-			status = write_zone_bitmap(dev, dzone_id, bitmap_block,
+			status = dmz_write_zone_bitmap(dev, dzone_id, bitmap_block,
 				zone_nr_bitmap_blocks,
 				dzone_bitmap_buffer,
 				&dzone_bitmap_block_address);
 
-			if (status)
+			if (status < 0)
 				found_error = 1;
 
-			status = write_zone_bitmap(dev, bzone_id, bitmap_block,
+			status = dmz_write_zone_bitmap(dev, bzone_id, bitmap_block,
 				zone_nr_bitmap_blocks,
 				bzone_bitmap_buffer,
 				&bzone_bitmap_block_address);
 
-			if (status)
+			if (status < 0)
 				found_error = 1;
 		}
 
 	}
 
-	return found_error;
+	return (found_error ? -1 : 0);
 
 }
 
 
-static int check_zone_bitmap_block(struct dmz_dev *dev, unsigned int zone_id,
-				   struct blk_zone *zone,
-				   __u64 bitmap_block, size_t zone_nr_bitmap_blocks,
-				   int repair)
+static int dmz_check_zone_bitmap_block(struct dmz_dev *dev, unsigned int zone_id,
+				       struct blk_zone *zone,
+				       __u64 bitmap_block, size_t zone_nr_bitmap_blocks,
+				       int repair)
 {
 	__u8 zone_bitmap_buffer[zone_nr_bitmap_blocks * DMZ_BLOCK_SIZE];
 	__u64 bitmap_block_address;
@@ -676,11 +662,11 @@ static int check_zone_bitmap_block(struct dmz_dev *dev, unsigned int zone_id,
 	assert(dmz_zone_seq_req(zone));
 
 	/* Read in the zone bits */
-	status = read_zone_bitmap(dev, zone_id, bitmap_block, zone_nr_bitmap_blocks,
-		zone_bitmap_buffer, &bitmap_block_address);
+	status = dmz_read_zone_bitmap(dev, zone_id, bitmap_block,
+		zone_nr_bitmap_blocks, zone_bitmap_buffer, &bitmap_block_address);
 
-	if (status)
-		return 1;
+	if (status < 0)
+		return -1;
 
 	assert(zone->wp >= dmz_zone_sector(zone));
 	__u64 wp_sect_offset = zone->wp - dmz_zone_sector(zone);
@@ -716,19 +702,22 @@ static int check_zone_bitmap_block(struct dmz_dev *dev, unsigned int zone_id,
 	}
 
 	if (repair) {
-		status = write_zone_bitmap(dev, zone_id, bitmap_block, zone_nr_bitmap_blocks,
-			zone_bitmap_buffer, &bitmap_block_address);
-		if (status)
+		status = dmz_write_zone_bitmap(dev, zone_id, bitmap_block,
+			zone_nr_bitmap_blocks, zone_bitmap_buffer,
+			&bitmap_block_address);
+		if (status < 0)
 			found_error = 1;
 	}
 
-	return found_error;
+	return (found_error ? -1 : 0);
 
 }
 
-static int check_zone_bitmaps(struct dmz_dev *dev, __u64 bitmap_block,
-	__u32 nr_bitmap_blocks, size_t zone_nr_bitmap_blocks,
-	__u64 map_block, __u32 nr_map_blocks, int repair)
+static int dmz_check_zone_bitmaps(struct dmz_dev *dev, __u64 bitmap_block,
+				  __u32 nr_bitmap_blocks,
+				  size_t zone_nr_bitmap_blocks,
+				  __u64 map_block, __u32 nr_map_blocks,
+				  int repair)
 {
 	int found_error = 0;
 	int status;
@@ -745,10 +734,10 @@ static int check_zone_bitmaps(struct dmz_dev *dev, __u64 bitmap_block,
 		if (!dmz_zone_seq_req(zone))
 			continue;
 
-		status = check_zone_bitmap_block(dev, i, zone, bitmap_block,
+		status = dmz_check_zone_bitmap_block(dev, i, zone, bitmap_block,
 			zone_nr_bitmap_blocks, repair);
 
-		if (status)
+		if (status < 0)
 			found_error = 1;
 
 	}
@@ -757,23 +746,25 @@ static int check_zone_bitmaps(struct dmz_dev *dev, __u64 bitmap_block,
 	its associated bzone's bitmap */
 	for (unsigned int i = 0; i < nr_map_blocks; i++) {
 		
-		status = check_mapped_zone_bitmap_overlap(dev, map_block + i,
+		status = dmz_check_mapped_zone_bitmap_overlap(dev, map_block + i,
 			bitmap_block, zone_nr_bitmap_blocks, repair);
 
-		if (status)
+		if (status < 0)
 			found_error = 1;
 
 	}
 
 	printf("Zone bitmaps verification complete\n");
 
-	return found_error;
+	return (found_error ? -1 : 0);
 
 }
 
 /* Check zone mappings and bitmaps for a metadata set */
-static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
-					 struct dm_zoned_super *sb, int repair)
+static int dmz_check_zone_mapping_and_bitmap(struct dmz_dev *dev,
+					     __u64 sb_address,
+					     struct dm_zoned_super *sb,
+					     int repair)
 {
 	__u64 map_block;
 	__u32 nr_map_blocks;
@@ -787,8 +778,8 @@ static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
 	nr_map_blocks = __le32_to_cpu(sb->nr_map_blocks);
 
 	/* First, lets do zone mapping check */
-	status = check_zone_mappings(dev, map_block, nr_map_blocks, repair);
-	if(status)
+	status = dmz_check_zone_mappings(dev, map_block, nr_map_blocks, repair);
+	if (status < 0)
 		found_error = 1;
 
 	bitmap_block = map_block + nr_map_blocks;
@@ -796,9 +787,9 @@ static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
 	zone_nr_bitmap_blocks = dev->zone_nr_blocks >> (DMZ_BLOCK_SHIFT + 3);
 
 	/* Then let's do zone bitmap check*/
-	status = check_zone_bitmaps(dev, bitmap_block,nr_bitmap_blocks,
+	status = dmz_check_zone_bitmaps(dev, bitmap_block,nr_bitmap_blocks,
 		zone_nr_bitmap_blocks, map_block, nr_map_blocks, repair);
-	if(status)
+	if (status < 0)
 		found_error = 1;
 
 	if (found_error)
@@ -810,7 +801,29 @@ static int check_zone_mapping_and_bitmap(struct dmz_dev *dev, __u64 sb_address,
 			"0x%llx to 0x%llx\n",
 			map_block, bitmap_block + nr_bitmap_blocks - 1);
 
-	return found_error;
+	return (found_error ? -1 : 0);
+
+}
+
+static int dmz_repair_superblock(struct dmz_dev *dev, __u64 sb_block)
+{
+	int found_error = 0;
+	int status;
+
+	printf("Start super block reconstruction\n");
+
+	status = dmz_write_super(dev, sb_block);
+	if (status < 0){
+		fprintf(stderr,
+			"Unable to write super block at adddress 0x%llx\n",
+			sb_block);
+		found_error = 1;
+	}
+
+	printf("\nSuper block reconstruction %s\n",
+		found_error ? "failed" : "done");
+
+	return (found_error ? -1 : 0);
 
 }
 
@@ -824,15 +837,15 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	int valid_sb[2] = {0};
 	int valid_md_blocks[2] = {0};
 	int status;
-	unsigned int max_nr_meta_zones = 0;
 	unsigned int i;
-	__u32 nr_active_zones = 0;
-	unsigned int last_md_zone_id;
-	
+
 	printf("Start checking process...\n");
 
-	calc_dmz_meta_data_loc(dev, &max_nr_meta_zones, &nr_active_zones,
-		&last_md_zone_id);
+	/* Calculate metadata locations */
+	if (dmz_calulate_md_loc(dev) < 0) {
+		fprintf(stderr, "Error calculating metadata locations\n");
+		return -1;
+	}
 
 	sb_address[0] = dev->sb_block;
 	status = dmz_read_block(dev, sb_address[0], (char *)sb_block_buffer[0]);
@@ -841,12 +854,12 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	status = -1;
 	#endif
 
-	if (status) {
+	if (status < 0) {
 		fprintf(stderr,
 			"Error reading super block at 0x%llx\n",
 			sb_address[0]);
 	} else {
-		status = check_superblock(dev, nr_active_zones,
+		status = dmz_check_superblock(dev, dev->nr_active_zones,
 				sb_block_buffer[0], sb_address[0], 1);
 		if (!status)
 			valid_sb[0] = 1;
@@ -872,12 +885,12 @@ int dmz_check(struct dmz_dev *dev, int repair)
 		status = -1;
 		#endif
 
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr,
 				"Error reading super block at 0x%llx\n",
 				sb_address[1]);
 		} else {
-			status = check_superblock(dev, nr_active_zones,
+			status = dmz_check_superblock(dev, dev->nr_active_zones,
 				sb_block_buffer[1], sb_address[1], 1);
 
 			if (!status)
@@ -892,7 +905,7 @@ int dmz_check(struct dmz_dev *dev, int repair)
 
 		printf("Searching for second super block\n");
 
-		for (i = 0; i < max_nr_meta_zones - 1; i++) {
+		for (i = 0; i < dev->max_nr_meta_zones - 1; i++) {
 			printf("\tAt 0x%llx\n", sb_address[1]);
 
 			status = dmz_read_block(dev, sb_address[1],
@@ -903,7 +916,8 @@ int dmz_check(struct dmz_dev *dev, int repair)
 			#endif
 
 			if (!status) {
-				status = check_superblock(dev, nr_active_zones,
+				status = dmz_check_superblock(dev,
+					dev->nr_active_zones,
 					sb_block_buffer[1], sb_address[1], 0);
 
 				if (!status) {
@@ -926,7 +940,6 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	/* We've got no valid super block... */
 	if (!valid_sb[0] && !valid_sb[1]) {
 		fprintf(stderr, "No valid superblock found\n");
-		/* To do: call format? */
 	}
 
 	/* Both super blocks are valid */
@@ -942,7 +955,7 @@ int dmz_check(struct dmz_dev *dev, int repair)
 				"blocks do not match.\n");
 		}
 
-		if (!matching_superblock(sb_0, sb_1)) {
+		if (!dmz_check_matching_superblock(sb_0, sb_1)) {
 			fprintf(stderr,
 				"Warning, the contents of two super "
 				"blocks do not match.\n");
@@ -951,7 +964,7 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	} 
 
 	if (valid_sb[0]) {
-		status = check_zone_mapping_and_bitmap(dev, sb_address[0],
+		status = dmz_check_zone_mapping_and_bitmap(dev, sb_address[0],
 			(struct dm_zoned_super *) sb_block_buffer[0], 0);
 
 		if (!status)
@@ -964,7 +977,7 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	}
 
 	if (valid_sb[1]) {
-		status = check_zone_mapping_and_bitmap(dev, sb_address[1],
+		status = dmz_check_zone_mapping_and_bitmap(dev, sb_address[1],
 			(struct dm_zoned_super *) sb_block_buffer[1], 0);
 
 		if (!status)
@@ -1017,18 +1030,57 @@ int dmz_check(struct dmz_dev *dev, int repair)
 
 		/* Don't have anything to base repair off of... */
 		if (!valid_sb[0] && !valid_sb[1]) {
-			printf("No valid metadata to reference for repair, "
-				"please re-format the disk\n");
-			repair_error = 1;
-			goto repair_end;
+			
+			recv_sb_index = 0;
+			status = dmz_repair_superblock(dev,
+				sb_address[recv_sb_index]);
+
+			if (status < 0) {
+				repair_error = -1;
+				goto repair_end;
+			}
+
+			/* Refresh the superblock content in memory */
+			status = dmz_read_block(dev, sb_address[0],
+				(char *)sb_block_buffer[0]);
+
+			if (status < 0) {
+				fprintf(stderr,
+					"Error reading super block at 0x%llx\n",
+					sb_address[0]);
+				repair_error = -1;
+				goto repair_end;
+			} else {
+				status = dmz_check_superblock(dev,
+					dev->nr_active_zones,
+					sb_block_buffer[0], sb_address[0], 1);
+				if (!status) {
+					valid_sb[0] = 1;
+				} else {
+					fprintf(stderr,
+						"Regenerated super block at "
+						"0x%llx failed check\n",
+						sb_address[0]);
+					repair_error = -1;
+					goto repair_end;
+				}
+			}
+
 		}
 
 		printf("Starting to recover metadata set %u\n", recv_sb_index);
 
 		/* Let's try to recover the zone mapping and bitmaps */
-		check_zone_mapping_and_bitmap(dev, sb_address[recv_sb_index],
+		status = dmz_check_zone_mapping_and_bitmap(dev,
+			sb_address[recv_sb_index],
 			(struct dm_zoned_super *) sb_block_buffer[recv_sb_index],
 			1);
+
+		if (status < 0) {
+			fprintf(stderr, "Error repairing metadata\n");
+			repair_error = -1;
+			goto repair_end;
+		}
 
 		/* And set the reference sb to what we've recovered */
 		ref_sb_index = recv_sb_index;
@@ -1085,7 +1137,7 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	/* Make sure there are enough room for the copy... */
 	if (sb_address[0] + __le64_to_cpu(sb_ref->nr_meta_blocks) >
 		sb_address[1]) {
-		repair_error = 1;
+		repair_error = -1;
 		fprintf(stderr,
 			"Not enough spacing between metadata sets, expect "
 			"at least %llu blocks\n",
@@ -1097,8 +1149,8 @@ int dmz_check(struct dmz_dev *dev, int repair)
 		DIV_ROUND_UP(__le64_to_cpu(sb_ref->nr_meta_blocks),
 		dev->zone_nr_blocks) * 2;
 
-	if (total_nr_meta_zones > max_nr_meta_zones) {
-		repair_error = 1;
+	if (total_nr_meta_zones > dev->max_nr_meta_zones) {
+		repair_error = -1;
 		fprintf(stderr,
 			"Error not enough random writeable zones to "
 			"fit metadata (%llu) blocks required\n",
@@ -1106,12 +1158,12 @@ int dmz_check(struct dmz_dev *dev, int repair)
 		goto repair_end;
 	}
 
-	struct blk_zone *last_md_zone = &dev->zones[last_md_zone_id];
+	struct blk_zone *last_md_zone = &dev->zones[dev->last_meta_zone];
 	__u64 last_md_block = dmz_sect2blk(dmz_zone_sector(last_md_zone)) +
 		dev->zone_nr_blocks - 1;
 
 	if (sb_address[1] + __le64_to_cpu(sb_ref->nr_meta_blocks) > last_md_block) {
-		repair_error = 1;
+		repair_error = -1;
 		fprintf(stderr,
 			"Error not not enough random writeable zones to "
 			"fit last metadata block, have 0x%llx need 0x%llx blocks\n"
@@ -1135,9 +1187,9 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	status = dmz_write_block(dev, dst_blk,
 		(char *)sb_block_buffer[cpy_sb_index]);
 
-	if (status) {
+	if (status < 0) {
 		fprintf(stderr, "Error writing block 0x%llx\n", dst_blk);
-		repair_error = 1;
+		repair_error = -1;
 		goto repair_end;
 	}
 
@@ -1145,19 +1197,19 @@ int dmz_check(struct dmz_dev *dev, int repair)
 	for (unsigned int i = 1; i < __le64_to_cpu(sb_ref->nr_meta_blocks); i++) {
 		status = dmz_read_block(dev, src_blk + i, (char *)block_buffer);
 
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr, "Error reading block 0x%llx\n",
 				src_blk + i);
-			repair_error = 1;
+			repair_error = -1;
 			break;
 		}
 
 		status = dmz_write_block(dev, dst_blk + i, (char *)block_buffer);
 
-		if (status) {
+		if (status < 0) {
 			fprintf(stderr, "Error writing block 0x%llx\n",
 				dst_blk + i);
-			repair_error = 1;
+			repair_error = -1;
 			break;
 		}
 
@@ -1171,6 +1223,6 @@ repair_end:
 		repair_error = -1;
 	}
 
-	printf("Repair done\n");
+	printf("Repair %s\n", repair_error ? "failed" : "done");
 	return repair_error;
 }
