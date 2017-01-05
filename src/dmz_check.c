@@ -279,7 +279,7 @@ static int dmz_check_zone_mapping_block(struct dmz_dev *dev,
 	__u8 map_block_buffer[DMZ_BLOCK_SIZE];
 	int found_error = 0;
 	int status;
-	int indent_cnt = 4;
+	int indent_cnt = 6;
 
 	status = dmz_read_block(dev, block_addr, (char *)map_block_buffer);
 
@@ -400,7 +400,7 @@ static int dmz_check_zone_mapping_block(struct dmz_dev *dev,
 
 	if (!valid_zone_ids) {
 		fprintf(stderr,
-			"%*sFound invalid zone ids in mapping\n",
+			"%*sFound invalid zone ids in mapping table\n",
 			indent_cnt, "");
 		found_error = 1;
 	}
@@ -535,7 +535,7 @@ static int dmz_check_zone_mappings(struct dmz_dev *dev, __u64 map_block,
 		map_zone_entry_bm[i] = 0;
 	}
 
-	printf("%*sStarting mapping table verification at 0x%llx for %u blocks\n",
+	printf("%*sStart mapping table verification at 0x%llx for %u blocks\n",
 		indent_cnt, "", map_block, nr_map_blocks);
 
 	for (unsigned int i = 0; i < nr_map_blocks; i++) {
@@ -565,7 +565,7 @@ static int dmz_check_mapped_zone_bitmap_overlap(struct dmz_dev *dev,
 	__u8 map_block_buffer[DMZ_BLOCK_SIZE];
 	int found_error = 0;
 	int status;
-	int indent_cnt = 4;
+	int indent_cnt = 6;
 
 	status = dmz_read_block(dev, block_addr, (char *)map_block_buffer);
 
@@ -693,7 +693,7 @@ static int dmz_check_zone_bitmap_block(struct dmz_dev *dev, unsigned int zone_id
 	__u64 bitmap_block_address;
 	int found_error = 0;
 	int status;
-	int indent_cnt = 4;
+	int indent_cnt = 6;
 
 	assert(dmz_zone_seq_req(zone));
 
