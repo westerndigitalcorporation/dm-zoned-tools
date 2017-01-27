@@ -26,19 +26,17 @@
 #include <asm/byteorder.h>
 
 /*
- * Determine metadata format and initialize meta zones.
+ * Fill and write a super block.
  */
 int dmz_write_super(struct dmz_dev *dev,
-		    unsigned long long offset)
+		    __u64 offset)
 {
-	unsigned long long sb_block = dev->sb_block + offset;
+	__u64 sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
-	__u64 gen = offset ? 0 : 1;
+	__u64 gen = 1;
 	__u32 crc;
-	char *buf;
+	__u8 *buf;
 	int ret;
-
-	printf("  Writing super block");
 
 	buf = malloc(DMZ_BLOCK_SIZE);
 	if (!buf) {
@@ -77,13 +75,16 @@ int dmz_write_super(struct dmz_dev *dev,
 	return ret;
 }
 
+/*
+ * Write mapping table blocks.
+ */
 static int dmz_write_mapping(struct dmz_dev *dev,
-			     unsigned long long offset)
+			     __u64 offset)
 {
-	unsigned long long map_block;
+	__u64 map_block;
 	struct dm_zoned_map *dmap;
 	unsigned int i;
-	char *buf;
+	__u8 *buf;
 	int ret = -1;
 
 	printf("  Writing mapping table\n");
@@ -119,12 +120,15 @@ static int dmz_write_mapping(struct dmz_dev *dev,
 	return ret;
 }
 
+/*
+ * Write zone bitmap blocks.
+ */
 static int dmz_write_bitmap(struct dmz_dev *dev,
-			    unsigned long long offset)
+			    __u64 offset)
 {
-	unsigned long long bitmap_block;
+	__u64 bitmap_block;
 	unsigned int i;
-	char *buf;
+	__u8 *buf;
 	int ret = -1;
 
 	printf("  Writing bitmap blocks\n");
@@ -154,8 +158,11 @@ static int dmz_write_bitmap(struct dmz_dev *dev,
 	return ret;
 }
 
+/*
+ * Write formatted metadata blocks.
+ */
 static int dmz_write_meta(struct dmz_dev *dev,
-			  unsigned long long offset)
+			  __u64 offset)
 {
 
 	/* Write mapping table */
@@ -167,6 +174,7 @@ static int dmz_write_meta(struct dmz_dev *dev,
 		return -1;
 
 	/* Write super block */
+	printf("  Writing super block\n");
 	if (dmz_write_super(dev, offset) < 0)
 		return -1;
 
@@ -174,170 +182,22 @@ static int dmz_write_meta(struct dmz_dev *dev,
 }
 
 /*
- * Calculate location of metadata.
- */
-int dmz_calulate_md_loc(struct dmz_dev *dev)
-{
-	struct blk_zone *zone;
-	unsigned int i = 0;
-	unsigned int nr_meta_blocks, nr_map_blocks;
-	unsigned int nr_chunks, nr_meta_zones;
-	unsigned int nr_bitmap_zones;
-
-	dev->nr_active_zones = 0;
-	dev->max_nr_meta_zones = 0;
-	dev->last_meta_zone = 0;
-	dev->nr_rnd_zones = 0;
-
-	/* Count useable zones */
-	for (i = 0; i < dev->nr_zones; i++) {
-
-		zone = &dev->zones[i];
-
-		if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
-			printf("%s: Ignoring read-only zone %u\n",
-			       dev->name,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-
-		if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
-			printf("%s: Ignoring offline zone %u\n",
-			       dev->name,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-
-		dev->nr_active_zones++;
-
-		if (dmz_zone_rnd(zone)) {
-			if (dev->sb_zone == NULL) {
-				dev->sb_zone = zone;
-				dev->last_meta_zone = i;
-				dev->max_nr_meta_zones = 1;
-			} else if (dev->last_meta_zone == (i - 1)) {
-				dev->last_meta_zone = i;
-				dev->max_nr_meta_zones++;
-			}
-			dev->nr_rnd_zones++;
-		}
-
-	}
-
-	/*
-	 * Randomly writeable zones are mandatory: at least 3
-	 * (two for metadata and one for bufferring random writes).
-	 */
-	if (dev->nr_rnd_zones < 3) {
-		fprintf(stderr,
-			"%s: Not enough random zones found\n",
-			dev->name);
-		return -1;
-	}
-
-	/*
-	 * It does not make sense to have more reserved
-	 * sequential zones than random zones.
-	 */
-	if (dev->nr_reserved_seq > dev->nr_rnd_zones)
-		dev->nr_reserved_seq = dev->nr_rnd_zones - 1;
-
-	if (dev->nr_active_zones < (dev->nr_reserved_seq + 1)) {
-		fprintf(stderr,
-			"%s: Not enough useable zones found\n",
-			dev->name);
-		return -1;
-	}
-
-
-	assert(dev->sb_zone);
-	dev->sb_block = dmz_sect2blk(dmz_zone_sector(dev->sb_zone));
-
-	/*
-	 * To facilitate addressing of the bitmap blocks, create
-	 * one bitmap per zone, including meta zones and unuseable
-	 * read-only and offline zones.
-	 */
-	dev->zone_nr_bitmap_blocks =
-		dev->zone_nr_blocks >> (DMZ_BLOCK_SHIFT + 3);
-	dev->nr_bitmap_blocks = dev->nr_zones * dev->zone_nr_bitmap_blocks;
-	nr_bitmap_zones = (dev->nr_bitmap_blocks + dev->zone_nr_blocks - 1)
-		/ dev->zone_nr_blocks;
-
-	if (dev->nr_active_zones <= (nr_bitmap_zones + dev->nr_reserved_seq)) {
-		fprintf(stderr,
-			"%s: Not enough zones\n",
-			dev->name);
-		return -1;
-	}
-
-	/*
-	 * Not counting the mapping table, the maximum number of chunks
-	 * is the number of useable zones minus the bitmap zones and the
-	 * number of reserved zones.
-	 */
-	nr_chunks = dev->nr_active_zones -
-		(nr_bitmap_zones + dev->nr_reserved_seq);
-
-	/* Assuming the maximum number of chunks, get the mapping table size */
-	nr_map_blocks = nr_chunks / DMZ_MAP_ENTRIES;
-	if (nr_chunks & DMZ_MAP_ENTRIES_MASK)
-		nr_map_blocks++;
-
-	/*
-	 * And then a first estimate of the number of metadata zones
-	 * (we need 2 sets of metadata).
-	 */
-	nr_meta_blocks = 1 + nr_map_blocks + dev->nr_bitmap_blocks;
-	nr_meta_zones = ((nr_meta_blocks + dev->zone_nr_blocks - 1)
-			 / dev->zone_nr_blocks);
-	dev->total_nr_meta_zones = nr_meta_zones << 1;
-
-	if (dev->total_nr_meta_zones > dev->nr_rnd_zones) {
-		fprintf(stderr,
-			"%s: Insufficient number of random zones "
-			"(need %u, have %u)\n",
-			dev->name,
-			dev->total_nr_meta_zones,
-			dev->nr_rnd_zones);
-		return -1;
-	}
-
-	/*
-	 * Now, fix the number of chunks and the mapping table size to
-	 * make sure that everything fits on the drive.
-	 */
-	dev->nr_chunks = dev->nr_active_zones -
-		(dev->total_nr_meta_zones + dev->nr_reserved_seq);
-	dev->nr_map_blocks = dev->nr_chunks / DMZ_MAP_ENTRIES;
-	if (dev->nr_chunks & DMZ_MAP_ENTRIES_MASK)
-		dev->nr_map_blocks++;
-	dev->map_block = dev->sb_block + 1;
-	dev->bitmap_block = dev->map_block + dev->nr_map_blocks;
-
-	dev->nr_meta_blocks = 1 + dev->nr_map_blocks + dev->nr_bitmap_blocks;
-	dev->nr_meta_zones = ((dev->nr_meta_blocks + dev->zone_nr_blocks - 1)
-			 / dev->zone_nr_blocks);
-	dev->total_nr_meta_zones = dev->nr_meta_zones << 1;
-
-	return 0;
-
-}
-
-/*
  * Format a device.
  */
 int dmz_format(struct dmz_dev *dev)
 {
-	/*First, calculate location of the metadata blocks */
-	if (dmz_calulate_md_loc(dev) < 0)
+
+	/* calculate location of metadata blocks */
+	if (dmz_locate_metadata(dev) < 0)
 		return -1;
 
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_seq_data_zones;
 
 		printf("Format:\n");
-		printf("  %u metadata blocks from block %llu (zone %u)\n",
+		printf("  %u useable zones\n",
+		       dev->nr_useable_zones);
+		printf("  Primary meta-data set: %u metadata blocks from block %llu (zone %u)\n",
 		       dev->nr_meta_blocks,
 		       dev->sb_block,
 		       dmz_zone_id(dev, dev->sb_zone));
@@ -348,19 +208,20 @@ int dmz_format(struct dmz_dev *dev)
 		       dev->nr_map_blocks);
 		printf("    %u bitmap blocks\n",
 		       dev->nr_bitmap_blocks);
-		printf("    Using %u zones for meta-data\n",
+		printf("    Using %u zones per meta-data set (%u total)\n",
+		       dev->nr_meta_zones,
 		       dev->total_nr_meta_zones);
 
 		dev->nr_rnd_zones -= dev->total_nr_meta_zones;
-		nr_seq_data_zones = dev->nr_active_zones
+		nr_seq_data_zones = dev->nr_useable_zones
 			- (dev->total_nr_meta_zones + dev->nr_rnd_zones +
 			dev->nr_reserved_seq);
-		printf("  %u chunks\n",
+		printf("  %u data chunks capacity\n",
 		       dev->nr_chunks);
-		printf("    %u random data zone%s\n",
+		printf("    %u random zone%s\n",
 		       dev->nr_rnd_zones,
 		       dev->nr_rnd_zones > 1 ? "s" : "");
-		printf("    %u sequential data zone%s\n",
+		printf("    %u sequential zone%s\n",
 		       nr_seq_data_zones,
 		       nr_seq_data_zones > 1 ? "s" : "");
 		printf("  %u sequential zone%s reserved for reclaim\n",
@@ -385,14 +246,8 @@ int dmz_format(struct dmz_dev *dev)
 		return -1;
 
 	/* Sync */
-	printf("Syncing disk\n");
-	if (fsync(dev->fd) < 0) {
-		fprintf(stderr,
-			"%s: fsync failed %d (%s)\n",
-			dev->name,
-			errno, strerror(errno));
+	if (dmz_sync_dev(dev) < 0)
 		return -1;
-	}
 
 	printf("Done.\n");
 

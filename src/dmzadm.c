@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 {
 	struct dmz_dev dev;
 	int i, ret;
-	int op;
+	enum dmz_op op;
 
 	/* Initialize */
 	memset(&dev, 0, sizeof(dev));
@@ -69,24 +69,16 @@ int main(int argc, char **argv)
 	}
 
 	if (strcmp(argv[1], "--format") == 0) {
-
 		op = DMZ_OP_FORMAT;
-
 	} else if (strcmp(argv[1], "--check") == 0) {
-
 		op = DMZ_OP_CHECK;
-
 	} else if (strcmp(argv[1], "--repair") == 0) {
-
 		op = DMZ_OP_REPAIR;
-
 	} else {
-
 		fprintf(stderr,
 			"Unknown operation \"%s\"\n",
 			argv[1]);
 		return 1;
-
 	}
 
 	if (argc < 3) {
@@ -153,7 +145,7 @@ int main(int argc, char **argv)
 	       dev.nr_zones,
 	       dev.zone_nr_sectors,
 	       (dev.zone_nr_sectors << 9) / (1024 * 1024));
-	printf("  %zu 4KB chunk blocks per zone\n",
+	printf("  %zu 4KB data blocks per zone\n",
 	       dev.zone_nr_blocks);
 
 	switch (op) {
@@ -163,11 +155,11 @@ int main(int argc, char **argv)
 		break;
 
 	case DMZ_OP_CHECK:
-		ret = dmz_check(&dev, 0);
+		ret = dmz_check(&dev);
 		break;
 
 	case DMZ_OP_REPAIR:
-		ret = dmz_check(&dev, 1);
+		ret = dmz_repair(&dev);
 		break;
 
 	default:
@@ -181,6 +173,5 @@ int main(int argc, char **argv)
 	dmz_close_dev(&dev);
 
 	return ret;
-
 }
 

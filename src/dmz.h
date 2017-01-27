@@ -120,6 +120,8 @@ struct dm_zoned_map {
 #define dmz_blk2sect(b)		((b) << DMZ_BLOCK_SECTORS_SHIFT)
 #define dmz_sect2blk(s)		((s) >> DMZ_BLOCK_SECTORS_SHIFT)
 
+#define DIV_ROUND_UP(n, d)	(((n) + (d) - 1) / (d))
+
 /*
  * Chunk mapping table metadata: 512 8-bytes entries per 4KB block.
  */
@@ -137,13 +139,14 @@ struct dm_zoned_map {
  */
 #define DMZ_VERBOSE		0x00000001
 #define DMZ_VVERBOSE		0x00000002
+#define DMZ_REPAIR  		0x00000004
 #define DMZ_ZONED_HA		0x00000010
 #define DMZ_ZONED_HM		0x00000020
 
 /*
  * Operations.
  */
-enum {
+enum dmz_op {
 	DMZ_OP_FORMAT = 1,
 	DMZ_OP_CHECK,
 	DMZ_OP_REPAIR,
@@ -152,7 +155,7 @@ enum {
 /*
  * Device descriptor.
  */
-typedef struct dmz_dev {
+struct dmz_dev {
 
 	/* Device file path and basename */
 	char		*path;
@@ -168,7 +171,7 @@ typedef struct dmz_dev {
 	unsigned int	nr_meta_blocks;
 	unsigned int	nr_reserved_seq;
 	unsigned int	nr_chunks;
-	unsigned int	nr_active_zones;
+	unsigned int	nr_useable_zones;
 	unsigned int	max_nr_meta_zones;
 	unsigned int	last_meta_zone;
 	unsigned int	total_nr_meta_zones;
@@ -195,7 +198,58 @@ typedef struct dmz_dev {
 	/* Device file descriptor */
 	int		fd;
 
-} dmz_dev_t;
+};
+
+/*
+ * In-memory representation of a metadata set.
+ */
+struct dmz_meta_set {
+
+	int		id;
+	unsigned int	flags;
+
+	__u64 		sb_block;
+	__u64		map_block;
+	__u64		bitmap_block;
+
+	__u8 		buf[DMZ_BLOCK_SIZE];
+	__u8 		*map_buf;
+
+	__u64 		gen;
+
+	unsigned int	error_count;
+	unsigned int	total_error_count;
+
+};
+
+/*
+ * Bitmap operations.
+ */
+static inline int dmz_test_bit(__u8 *bitmap,
+			       unsigned int bit)
+{
+	return bitmap[bit >> 3] & (1 << (bit & 0x7));
+}
+static inline void dmz_set_bit(__u8 *bitmap,
+			       unsigned int bit)
+{
+	bitmap[bit >> 3] |= 1 << (bit & 0x7);
+}
+static inline void dmz_clear_bit(__u8 *bitmap,
+				 unsigned int bit)
+{
+	bitmap[bit >> 3] &= ~(1 << (bit & 0x7));
+}
+
+/*
+ * Metadata set flags.
+ */
+#define DMZ_MSET_SB_VALID	0x00000001
+#define DMZ_MSET_MAP_VALID	0x00000002
+#define DMZ_MSET_BITMAP_VALID	0x00000004
+#define DMZ_MSET_VALID		(DMZ_MSET_SB_VALID |  \
+				 DMZ_MSET_MAP_VALID |	\
+				 DMZ_MSET_BITMAP_VALID)
 
 #define dmz_dev_is_ha(dev)	((dev)->flags & DMZ_ZONED_HA)
 #define dmz_dev_is_hm(dev)	((dev)->flags & DMZ_ZONED_HM)
@@ -247,11 +301,11 @@ dmz_zone_cond_str(struct blk_zone *zone)
 	return "Unknown-condition";
 }
 
+#define dmz_block_zone_id(dev, block)	((unsigned int)((block) / (dev)->zone_nr_blocks))
 #define dmz_zone_empty(z)	(dmz_zone_cond(z) == BLK_ZONE_COND_EMPTY)
 
 #define dmz_zone_sector(z)	(z)->start
-#define dmz_zone_id(dev, zone)	((unsigned int)(dmz_zone_sector(zone) \
-						/ (dev)->zone_nr_sectors))
+#define dmz_zone_id(dev, zone)	((unsigned int)(dmz_zone_sector(zone) / (dev)->zone_nr_sectors))
 #define dmz_zone_length(z)	(z)->len
 #define dmz_zone_wp_sector(z)	(z)->wp
 #define dmz_zone_need_reset(z)	(int)(z)->reset
@@ -259,16 +313,18 @@ dmz_zone_cond_str(struct blk_zone *zone)
 
 extern int dmz_open_dev(struct dmz_dev *dev);
 extern void dmz_close_dev(struct dmz_dev *dev);
+extern int dmz_sync_dev(struct dmz_dev *dev);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
-extern int dmz_write_block(struct dmz_dev *dev, __u64 block, char *buf);
-extern int dmz_read_block(struct dmz_dev *dev, __u64 block, char *buf);
+extern int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
+extern int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
 
 extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
-extern int dmz_calulate_md_loc(struct dmz_dev *dev);
+extern int dmz_locate_metadata(struct dmz_dev *dev);
+extern int dmz_write_super(struct dmz_dev *dev, __u64 offset);
 extern int dmz_format(struct dmz_dev *dev);
-extern int dmz_check(struct dmz_dev *dev, int repair);
-extern int dmz_write_super(struct dmz_dev *dev, unsigned long long offset);
+extern int dmz_check(struct dmz_dev *dev);
+extern int dmz_repair(struct dmz_dev *dev);
 
 #endif /* __DMZ_H__ */
