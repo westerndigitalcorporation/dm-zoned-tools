@@ -68,25 +68,25 @@ struct dm_zoned_super {
 	__le64		sb_block;		/*  24 */
 
 	/* The number of metadata blocks, including this super block */
-	__le64		nr_meta_blocks;		/*  32 */
+	__le32		nr_meta_blocks;		/*  28 */
 
 	/* The number of sequential zones reserved for reclaim */
-	__le32		nr_reserved_seq;	/*  36 */
+	__le32		nr_reserved_seq;	/*  32 */
 
 	/* The number of entries in the mapping table */
-	__le32		nr_chunks;		/*  40 */
+	__le32		nr_chunks;		/*  36 */
 
 	/* The number of blocks used for the chunk mapping table */
-	__le32		nr_map_blocks;		/*  44 */
+	__le32		nr_map_blocks;		/*  40 */
 
 	/* The number of blocks used for the block bitmaps */
-	__le32		nr_bitmap_blocks;	/*  48 */
+	__le32		nr_bitmap_blocks;	/*  44 */
 
 	/* Checksum */
-	__le32		crc;			/*  52 */
+	__le32		crc;			/*  48 */
 
 	/* Padding to full 512B sector */
-	__u8		reserved[460];		/* 512 */
+	__u8		reserved[464];		/* 512 */
 
 } __attribute__ ((packed));
 
