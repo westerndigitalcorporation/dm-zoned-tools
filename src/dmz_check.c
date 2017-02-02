@@ -466,6 +466,7 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 	unsigned int b, wp_block;
 	int ret = 0, ind = 4;
 	unsigned int dzone_id = dmz_zone_id(dev, zone);
+	unsigned int bad_bits;
 	int errors = 0;
 	__u8 *dbuf, *bbuf = NULL;
 
@@ -475,17 +476,24 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 		return -1;
 
 	/* No valid block should be present after the write pointer */
+	bad_bits = 0;
 	wp_block = dmz_sect2blk(zone->wp - zone->start);
 	for (b = wp_block; b < dev->zone_nr_blocks; b++) {
 		if (!dmz_test_bit(dbuf, b))
 			continue;
-		dmz_err(dev, ind,
-			"Zone %u: block %u valid after zone wp block %u\n",
-			dzone_id, b, wp_block);
+		dmz_verr(dev, ind,
+			 "Zone %u: block %u valid after zone wp block %u\n",
+			 dzone_id, b, wp_block);
+		bad_bits++;
 		errors++;
 		if (dmz_repair_dev(dev))
 			dmz_clear_bit(dbuf, b);
 	}
+
+	if (bad_bits)
+		dmz_err(dev, ind,
+			"Zone %u: %u blocks valid after zone wp block %u\n",
+			dzone_id, bad_bits, wp_block);
 
 	if (bzone_id != DMZ_MAP_UNMAPPED) {
 
@@ -494,16 +502,23 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 		if (ret != 0)
 			goto out;
 
+		bad_bits = 0;
 		for (b = 0; b < wp_block; b++) {
 			if (dmz_test_bit(dbuf, b) && dmz_test_bit(bbuf, b)) {
-				dmz_err(dev, ind,
-					"Zone %u: block %u valid in buffer zone %u\n",
-					dzone_id, b, bzone_id);
+				bad_bits++;
+				dmz_verr(dev, ind,
+					 "Zone %u: block %u valid in buffer zone %u\n",
+					 dzone_id, b, bzone_id);
 				errors++;
 				if (dmz_repair_dev(dev))
 					dmz_clear_bit(dbuf, b);
 			}
 		}
+
+		if (bad_bits)
+			dmz_err(dev, ind,
+				"Zone %u: %u blocks also marked as valid in buffer zone %u\n",
+				dzone_id, bad_bits, bzone_id);
 
 		free(bbuf);
 
