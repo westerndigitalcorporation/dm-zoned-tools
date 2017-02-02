@@ -27,17 +27,17 @@
 static void dmzadm_usage(void)
 {
 	printf("Usage: dmzadm <operation> <device path> [options]\n");
-	printf("Operations:\n"
+	printf("Operations\n"
 	       "  --help | -h	: General help message\n"
 	       "  --format	: Format a block device metadata\n"
 	       "  --check	: Check a block device metadata\n"
 	       "  --repair	: Repair a block device metadata\n");
 
-	printf("Common options(all operations):\n"
+	printf("General options\n"
 	       "  --verbose	: Verbose output\n"
 	       "  --vverbose	: Very verbose output\n");
 
-	printf("Format options:\n"
+	printf("Format operation options\n"
 	       "  --seq <num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
