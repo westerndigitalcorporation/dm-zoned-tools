@@ -364,7 +364,7 @@ static int dmz_check_mapping(struct dmz_dev *dev,
 	unsigned int chunk = 0;
 	int ret, ind = 2;
 
-	dmz_msg(dev, ind, "Checking data chunk mapping... ");
+	dmz_msg(dev, ind, "Checking data chunk mapping...\n");
 	fflush(stdout);
 
 	mset->error_count = 0;
@@ -379,8 +379,8 @@ static int dmz_check_mapping(struct dmz_dev *dev,
 		mset->error_count += dmz_check_chunk_mapping(dev, mset, chunk);
 
 	if (mset->error_count == 0) {
-		dmz_msg(dev, 0, "No error found\n");
-		dmz_msg(dev, ind + 2, "%u mapped chunks, %u buffered chunks\n",
+		dmz_msg(dev, ind + 2,
+			"No error: %u mapped chunks, %u buffered chunks\n",
 			mset->nr_mapped_chunks, mset->nr_buf_chunks);
 		mset->flags |= DMZ_MSET_MAP_VALID;
 		return 0;
@@ -413,6 +413,7 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 {
 	int ret = 0, ind = 4;
 	unsigned int b, zone_id = dmz_zone_id(dev, zone);
+	unsigned int bad_bits = 0;
 	int errors = 0;
 	__u8 *buf;
 
@@ -424,13 +425,21 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 	for (b = 0; b < dev->zone_nr_blocks; b++) {
 		if (!dmz_test_bit(buf, b))
 			continue;
-		dmz_err(dev, ind,
-			"Zone %u: unmapped zone but block %u valid\n",
-			zone_id, b);
+		bad_bits++;
+		dmz_verr(dev, ind,
+			 "Zone %u: unmapped zone but block %u valid\n",
+			 zone_id, b);
+		ind = 4;
 		errors++;
 		if (dmz_repair_dev(dev))
 			dmz_clear_bit(buf, b);
 	}
+
+	if (bad_bits)
+		dmz_verr(dev, ind,
+			 "Zone %u: unmapped zone but %u block%s valid\n",
+			 zone_id, bad_bits,
+			 (bad_bits > 1) ? "s" : "");
 
 	if (dmz_repair_dev(dev) && errors) {
 		ret = dmz_write_zone_bitmap(dev, mset, zone_id, buf);
@@ -492,8 +501,10 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 
 	if (bad_bits)
 		dmz_err(dev, ind,
-			"Zone %u: %u blocks valid after zone wp block %u\n",
-			dzone_id, bad_bits, wp_block);
+			"Zone %u: %u block%s valid after zone wp block %u\n",
+			dzone_id,
+			bad_bits, (bad_bits > 1) ? "s" : "",
+			wp_block);
 
 	if (bzone_id != DMZ_MAP_UNMAPPED) {
 
@@ -517,8 +528,10 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 
 		if (bad_bits)
 			dmz_err(dev, ind,
-				"Zone %u: %u blocks also marked as valid in buffer zone %u\n",
-				dzone_id, bad_bits, bzone_id);
+				"Zone %u: %u block%s also marked as valid in buffer zone %u\n",
+				dzone_id,
+				bad_bits, (bad_bits > 1) ? "s" : "",
+				bzone_id);
 
 		free(bbuf);
 
@@ -565,10 +578,11 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 {
 	struct blk_zone *zone;
 	unsigned int chunk, bzone_id;
-	unsigned int i;
+	unsigned int i, unmapped_zones = 0;
+	int ind = 2;
 	int ret;
 
-	dmz_msg(dev, 2, "Checking zone bitmaps... ");
+	dmz_msg(dev, ind, "Checking zone bitmaps...\n");
 	fflush(stdout);
 	mset->error_count = 0;
 
@@ -588,6 +602,7 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 			ret = dmz_check_unmapped_zone_bitmap(dev, mset, zone);
 			if (ret != 0)
 				return -1;
+			unmapped_zones++;
 			continue;
 		}
 
@@ -601,17 +616,18 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	}
 
 	if (mset->error_count == 0) {
-		dmz_msg(dev, 0, "No error found\n");
+		dmz_msg(dev, ind + 2,
+			"No error: %u unmapped zones checked\n",
+			unmapped_zones);
 		mset->flags |= DMZ_MSET_BITMAP_VALID;
 		return 0;
 	}
 
-	dmz_msg(dev, 0,
-		"%u error%s found (metadata block range %llu..%llu)\n",
+	dmz_msg(dev, ind + 2,
+		"%u error%s found (%u unmapped zones checked)\n",
 		mset->error_count,
 		(mset->error_count > 1) ? "s" : "",
-		mset->bitmap_block,
-		mset->bitmap_block + dev->nr_bitmap_blocks - 1);
+		unmapped_zones);
 
 	mset->total_error_count += mset->error_count;
 
@@ -945,7 +961,7 @@ static int dmz_compare_meta(struct dmz_dev *dev,
 	unsigned int b;
 
 	dmz_msg(dev, ind,
-		"Validating %s metadata set against %s metadata set... ",
+		"Validating %s metadata set against %s metadata set...\n",
 		(mset->id == 0) ? "primary" : "secondary",
 		(check_mset->id == 0) ? "primary" : "secondary");
 	fflush(stdout);
@@ -975,7 +991,6 @@ static int dmz_compare_meta(struct dmz_dev *dev,
 	}
 
 	if (mset->error_count == 0) {
-		printf("No error found\n");
 		mset->flags = DMZ_MSET_VALID;
 	} else {
 		mset->total_error_count += mset->error_count;
