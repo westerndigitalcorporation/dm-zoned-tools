@@ -469,12 +469,14 @@ out:
  */
 static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 					struct dmz_meta_set *mset,
+					unsigned int chunk,
 					struct blk_zone *zone,
 					unsigned int bzone_id)
 {
 	unsigned int b, wp_block;
 	int ret = 0, ind = 4;
 	unsigned int dzone_id = dmz_zone_id(dev, zone);
+	unsigned int dzone_weight = 0, bzone_weight = 0;
 	unsigned int bad_bits;
 	int errors = 0;
 	__u8 *dbuf, *bbuf = NULL;
@@ -497,12 +499,17 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 	/* No valid block should be present after the write pointer */
 	bad_bits = 0;
 	wp_block = dmz_sect2blk(zone->wp - zone->start);
+	for (b = 0; b < wp_block; b++) {
+		if (dmz_test_bit(dbuf, b))
+			dzone_weight++;
+	}
 	for (b = wp_block; b < dev->zone_nr_blocks; b++) {
 		if (!dmz_test_bit(dbuf, b))
 			continue;
 		dmz_verr(dev, ind,
 			 "Zone %u: block %u valid after zone wp block %u\n",
 			 dzone_id, b, wp_block);
+		dzone_weight++;
 		bad_bits++;
 		errors++;
 		if (dmz_repair_dev(dev))
@@ -511,21 +518,25 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 
 	if (bad_bits)
 		dmz_err(dev, ind,
-			"Zone %u: %u block%s valid after zone wp block %u\n",
-			dzone_id,
+			"Zone %u: mapped to chunk %u, weight %u, "
+			"%u block%s valid after zone wp block %u\n",
+			dzone_id, chunk, dzone_weight,
 			bad_bits, dmz_plural(bad_bits),
 			wp_block);
 
 	if (bzone_id != DMZ_MAP_UNMAPPED) {
 
 		/* Read in the buffer zone bitmap */
-		ret = dmz_read_zone_bitmap(dev, mset, dzone_id, &bbuf);
+		ret = dmz_read_zone_bitmap(dev, mset, bzone_id, &bbuf);
 		if (ret != 0)
 			goto out;
 
 		bad_bits = 0;
 		for (b = 0; b < wp_block; b++) {
-			if (dmz_test_bit(dbuf, b) && dmz_test_bit(bbuf, b)) {
+			if (!dmz_test_bit(bbuf, b))
+				continue;
+			bzone_weight++;
+			if (dmz_test_bit(dbuf, b)) {
 				bad_bits++;
 				dmz_verr(dev, ind,
 					 "Zone %u: block %u valid in buffer zone %u\n",
@@ -535,13 +546,19 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 					dmz_clear_bit(dbuf, b);
 			}
 		}
+		for (b = wp_block; b < dev->zone_nr_blocks; b++) {
+			if (dmz_test_bit(bbuf, b))
+				bzone_weight++;
+		}
 
 		if (bad_bits)
 			dmz_err(dev, ind,
-				"Zone %u: %u block%s also marked as valid in buffer zone %u\n",
-				dzone_id,
+				"Zone %u: mapped to chunk %u, weight %u, "
+				"%u valid block%s overlap with buffer zone %u (weight %u)\n",
+				dzone_id, chunk, dzone_weight,
 				bad_bits, dmz_plural(bad_bits),
-				bzone_id);
+				bzone_id,
+				bzone_weight);
 
 		free(bbuf);
 
@@ -616,7 +633,7 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 				return -1;
 			unmapped_zones++;
 		} else {
-			ret = dmz_check_mapped_zone_bitmap(dev, mset,
+			ret = dmz_check_mapped_zone_bitmap(dev, mset, chunk,
 							   zone, bzone_id);
 			if (ret != 0)
 				return -1;
