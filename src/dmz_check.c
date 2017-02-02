@@ -275,7 +275,7 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 				   unsigned int chunk)
 {
 	unsigned int dzone_id, bzone_id;
-	struct blk_zone *bzone;
+	struct blk_zone *bzone, *dzone;
 	unsigned int errors = 0;
 	int ind = 4;
 
@@ -291,7 +291,7 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 			if (dmz_repair_dev(dev))
 				bzone_id = DMZ_MAP_UNMAPPED;
 		}
-		return errors;
+		goto out;
 	}
 
 	/* This is a mapped chunk */
@@ -307,25 +307,39 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	if (bzone_id == DMZ_MAP_UNMAPPED)
 		goto out;
 
-	/* This is a mapped and buffered chunk */
-	if (bzone_id == dzone_id ||
-	    bzone_id >= dev->nr_zones) {
+	dzone = &dev->zones[dzone_id];
+	if (dmz_zone_rnd(dzone)) {
 		dmz_err(dev, ind,
-			"Chunk %u: invalid buffer zone ID %u\n",
+			"Chunk %u: unexpected buffer zone ID %u\n",
 			chunk, dzone_id);
 		errors++;
 		if (dmz_repair_dev(dev))
 			bzone_id = DMZ_MAP_UNMAPPED;
 	}
 
-	bzone = &dev->zones[bzone_id];
-	if (!dmz_zone_rnd(bzone)) {
-		dmz_err(dev, ind,
-			"Chunk %u: buffer zone %u is not a random zone\n",
-			chunk, bzone_id);
-		errors++;
-		if (dmz_repair_dev(dev))
-			bzone_id = DMZ_MAP_UNMAPPED;
+	/* This is a mapped and buffered chunk */
+	if(bzone_id != DMZ_MAP_UNMAPPED) {
+		if (bzone_id == dzone_id ||
+		    bzone_id >= dev->nr_zones) {
+			dmz_err(dev, ind,
+				"Chunk %u: invalid buffer zone ID %u\n",
+				chunk, dzone_id);
+			errors++;
+			if (dmz_repair_dev(dev))
+				bzone_id = DMZ_MAP_UNMAPPED;
+		}
+	}
+
+	if(bzone_id != DMZ_MAP_UNMAPPED) {
+		bzone = &dev->zones[bzone_id];
+		if (!dmz_zone_rnd(bzone)) {
+			dmz_err(dev, ind,
+				"Chunk %u: buffer zone %u is not a random zone\n",
+				chunk, bzone_id);
+			errors++;
+			if (dmz_repair_dev(dev))
+				bzone_id = DMZ_MAP_UNMAPPED;
+		}
 	}
 
 out:
@@ -516,7 +530,8 @@ static void dmz_get_zone_mapping(struct dmz_dev *dev, struct dmz_meta_set *mset,
 
 	for (c = 0; c < dev->nr_chunks; c++) {
 		dmz_get_chunk_mapping(dev, mset, c, &dzone_id, bzone_id);
-		if (dzone_id == dmz_zone_id(dev, zone)) {
+		if (dzone_id == dmz_zone_id(dev, zone) ||
+			*bzone_id == dmz_zone_id(dev, zone)) {
 			*chunk = c;
 			return;
 		}
