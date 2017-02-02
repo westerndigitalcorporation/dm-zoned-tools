@@ -530,8 +530,7 @@ static void dmz_get_zone_mapping(struct dmz_dev *dev, struct dmz_meta_set *mset,
 
 	for (c = 0; c < dev->nr_chunks; c++) {
 		dmz_get_chunk_mapping(dev, mset, c, &dzone_id, bzone_id);
-		if (dzone_id == dmz_zone_id(dev, zone) ||
-			*bzone_id == dmz_zone_id(dev, zone)) {
+		if (dzone_id == dmz_zone_id(dev, zone)) {
 			*chunk = c;
 			return;
 		}
@@ -554,11 +553,11 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	mset->error_count = 0;
 
 	/*
-	 * For mapped sequential zones, make sure that all valid are
-	 * are before the zone write pointer and if the zone is
-	 * buffered that there is no overlap of valid blocks with
-	 * the buffer zone. For unmapped zones, check that the bitmap
-	 * is empty, and that sequential zones are empty.
+	 * For mapped sequential zones, make sure that all valid blocks
+	 * are before the zone write pointer position. If the zone is
+	 * buffered, also check there is no valid block overlap between
+	 * the sequential and buffer zones. For unmapped zones, check that
+	 * the bitmap is empty, and that sequential zones are empty.
 	 */
 	for (i = 0; i < dev->nr_zones; i++) {
 
