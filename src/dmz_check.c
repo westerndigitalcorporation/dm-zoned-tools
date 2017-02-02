@@ -317,29 +317,29 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 			bzone_id = DMZ_MAP_UNMAPPED;
 	}
 
+	if(bzone_id == DMZ_MAP_UNMAPPED)
+		goto out;
+
 	/* This is a mapped and buffered chunk */
-	if(bzone_id != DMZ_MAP_UNMAPPED) {
-		if (bzone_id == dzone_id ||
-		    bzone_id >= dev->nr_zones) {
-			dmz_err(dev, ind,
-				"Chunk %u: invalid buffer zone ID %u\n",
-				chunk, dzone_id);
-			errors++;
-			if (dmz_repair_dev(dev))
-				bzone_id = DMZ_MAP_UNMAPPED;
-		}
+	if (bzone_id == dzone_id ||
+	    bzone_id >= dev->nr_zones) {
+		dmz_err(dev, ind,
+			"Chunk %u: invalid buffer zone ID %u\n",
+			chunk, dzone_id);
+		errors++;
+		if (dmz_repair_dev(dev))
+			bzone_id = DMZ_MAP_UNMAPPED;
+		goto out;
 	}
 
-	if(bzone_id != DMZ_MAP_UNMAPPED) {
-		bzone = &dev->zones[bzone_id];
-		if (!dmz_zone_rnd(bzone)) {
-			dmz_err(dev, ind,
-				"Chunk %u: buffer zone %u is not a random zone\n",
-				chunk, bzone_id);
-			errors++;
-			if (dmz_repair_dev(dev))
-				bzone_id = DMZ_MAP_UNMAPPED;
-		}
+	bzone = &dev->zones[bzone_id];
+	if (!dmz_zone_rnd(bzone)) {
+		dmz_err(dev, ind,
+			"Chunk %u: buffer zone %u is not a random zone\n",
+			chunk, bzone_id);
+		errors++;
+		if (dmz_repair_dev(dev))
+			bzone_id = DMZ_MAP_UNMAPPED;
 	}
 
 out:
