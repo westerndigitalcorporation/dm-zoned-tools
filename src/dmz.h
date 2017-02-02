@@ -217,6 +217,9 @@ struct dmz_meta_set {
 
 	__u64 		gen;
 
+	unsigned int 	nr_mapped_chunks;
+	unsigned int 	nr_buf_chunks;
+
 	unsigned int	error_count;
 	unsigned int	total_error_count;
 

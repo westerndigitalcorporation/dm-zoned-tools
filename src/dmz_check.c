@@ -285,7 +285,7 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 		/* Unmapped chunk: there should be no buffer zone */
 		if (bzone_id != DMZ_MAP_UNMAPPED) {
 			dmz_err(dev, ind,
-				"Chunk %u: unmapped but buffer zone ID %u set\n",
+				"Chunk %u: unmapped but buffer zone %u set\n",
 				chunk, bzone_id);
 			errors++;
 			if (dmz_repair_dev(dev))
@@ -295,9 +295,10 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	}
 
 	/* This is a mapped chunk */
+	mset->nr_mapped_chunks++;
 	if (dzone_id >= dev->nr_zones) {
 		dmz_err(dev, ind,
-			"Chunk %u: invalid data zone ID %u\n",
+			"Chunk %u: invalid data zone %u\n",
 			chunk, dzone_id);
 		errors++;
 		if (dmz_repair_dev(dev))
@@ -307,29 +308,30 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	if (bzone_id == DMZ_MAP_UNMAPPED)
 		goto out;
 
+	/* This is a mapped and buffered chunk */
+	mset->nr_buf_chunks++;
 	dzone = &dev->zones[dzone_id];
 	if (dmz_zone_rnd(dzone)) {
 		dmz_err(dev, ind,
-			"Chunk %u: unexpected buffer zone ID %u\n",
-			chunk, dzone_id);
+			"Chunk %u: mapped to random zone %u but using buffer zone %u\n",
+			chunk, dzone_id, bzone_id);
 		errors++;
-		if (dmz_repair_dev(dev))
+		if (dmz_repair_dev(dev)) {
 			bzone_id = DMZ_MAP_UNMAPPED;
+			goto out;
+		}
 	}
 
-	if(bzone_id == DMZ_MAP_UNMAPPED)
-		goto out;
-
-	/* This is a mapped and buffered chunk */
 	if (bzone_id == dzone_id ||
 	    bzone_id >= dev->nr_zones) {
 		dmz_err(dev, ind,
-			"Chunk %u: invalid buffer zone ID %u\n",
+			"Chunk %u: invalid buffer zone %u\n",
 			chunk, dzone_id);
 		errors++;
-		if (dmz_repair_dev(dev))
+		if (dmz_repair_dev(dev)) {
 			bzone_id = DMZ_MAP_UNMAPPED;
-		goto out;
+			goto out;
+		}
 	}
 
 	bzone = &dev->zones[bzone_id];
@@ -378,6 +380,8 @@ static int dmz_check_mapping(struct dmz_dev *dev,
 
 	if (mset->error_count == 0) {
 		dmz_msg(dev, 0, "No error found\n");
+		dmz_msg(dev, ind + 2, "%u mapped chunks, %u buffered chunks\n",
+			mset->nr_mapped_chunks, mset->nr_buf_chunks);
 		mset->flags |= DMZ_MSET_MAP_VALID;
 		return 0;
 	}
@@ -421,7 +425,7 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 		if (!dmz_test_bit(buf, b))
 			continue;
 		dmz_err(dev, ind,
-			"Zone %u: unmapped zone, but block %u valid\n",
+			"Zone %u: unmapped zone but block %u valid\n",
 			zone_id, b);
 		errors++;
 		if (dmz_repair_dev(dev))
@@ -436,7 +440,7 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 
 	if (dmz_zone_seq_req(zone) && zone->wp != zone->start) {
 		dmz_err(dev, ind,
-			"Zone %u: non-empty unmapped sequential zone\n",
+			"Zone %u: unmapped sequential zone not empty\n",
 			zone_id);
 		errors++;
 		if (dmz_repair_dev(dev))
@@ -493,8 +497,8 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 		for (b = 0; b < wp_block; b++) {
 			if (dmz_test_bit(dbuf, b) && dmz_test_bit(bbuf, b)) {
 				dmz_err(dev, ind,
-					"Zone %u: block %u valid in buffer zone\n",
-					dzone_id, b);
+					"Zone %u: block %u valid in buffer zone %u\n",
+					dzone_id, b, bzone_id);
 				errors++;
 				if (dmz_repair_dev(dev))
 					dmz_clear_bit(dbuf, b);
@@ -522,22 +526,23 @@ out:
 /*
  * Get a zone mapping state and eventual buffer zone.
  */
-static void dmz_get_zone_mapping(struct dmz_dev *dev, struct dmz_meta_set *mset,
-				 struct blk_zone *zone, unsigned int *chunk,
-				 unsigned int *bzone_id)
+static unsigned int dmz_get_zone_mapping(struct dmz_dev *dev,
+					 struct dmz_meta_set *mset,
+					 struct blk_zone *zone,
+					 unsigned int *bzone_id)
 {
-	unsigned int c, dzone_id;
+	unsigned int c, dzid, bzid;
 
 	for (c = 0; c < dev->nr_chunks; c++) {
-		dmz_get_chunk_mapping(dev, mset, c, &dzone_id, bzone_id);
-		if (dzone_id == dmz_zone_id(dev, zone)) {
-			*chunk = c;
-			return;
+		dmz_get_chunk_mapping(dev, mset, c, &dzid, &bzid);
+		if (dmz_zone_id(dev, zone) == dzid ||
+		    dmz_zone_id(dev, zone) == bzid) {
+			*bzone_id = bzid;
+			return c;
 		}
 	}
 
-	*chunk = DMZ_MAP_UNMAPPED;
-	*bzone_id = DMZ_MAP_UNMAPPED;
+	return DMZ_MAP_UNMAPPED;
 }
 
 static int dmz_check_bitmaps(struct dmz_dev *dev,
@@ -562,8 +567,8 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	for (i = 0; i < dev->nr_zones; i++) {
 
 		zone = &dev->zones[i];
-		dmz_get_zone_mapping(dev, mset, zone, &chunk, &bzone_id);
 
+		chunk = dmz_get_zone_mapping(dev, mset, zone, &bzone_id);
 		if (chunk == DMZ_MAP_UNMAPPED) {
 			ret = dmz_check_unmapped_zone_bitmap(dev, mset, zone);
 			if (ret != 0)
