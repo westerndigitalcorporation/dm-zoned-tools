@@ -635,7 +635,7 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	}
 
 	dmz_msg(dev, ind + 2,
-		"%u error%s found: %u unmapped zone%s + %u mapped zone%s checked)\n",
+		"%u error%s found: %u unmapped zone%s + %u mapped zone%s checked\n",
 		mset->error_count, (mset->error_count > 1) ? "s" : "",
 		unmapped_zones, dmz_plural(unmapped_zones),
 		mapped_zones, dmz_plural(mapped_zones));
