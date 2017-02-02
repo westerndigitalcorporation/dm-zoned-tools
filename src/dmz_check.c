@@ -33,6 +33,7 @@
 /*
  * Message macro.
  */
+#define dmz_plural(val)		((val> 1) ? "s" : "")
 #define dmz_msg(dev,ind,format,args...)				\
 	printf("%*s" format, ind, "", ## args)
 #define dmz_err(dev,ind,format,args...)				\
@@ -380,18 +381,18 @@ static int dmz_check_mapping(struct dmz_dev *dev,
 
 	if (mset->error_count == 0) {
 		dmz_msg(dev, ind + 2,
-			"No error: %u mapped chunks, %u buffered chunks\n",
-			mset->nr_mapped_chunks, mset->nr_buf_chunks);
+			"No error: %u mapped chunk%s (%u buffered) checked\n",
+			mset->nr_mapped_chunks, dmz_plural(mset->nr_mapped_chunks),
+			mset->nr_buf_chunks);
 		mset->flags |= DMZ_MSET_MAP_VALID;
 		return 0;
 	}
 
-	dmz_msg(dev, 0,
-		"%u error%s found (metadata block range %llu..%llu)\n",
-		mset->error_count,
-		(mset->error_count > 1) ? "s" : "",
-		mset->map_block,
-		mset->map_block + dev->nr_map_blocks - 1);
+	dmz_err(dev, ind + 2,
+		"%u error%s found: %u mapped chunk%s (%u buffered) checked\n",
+		mset->error_count, dmz_plural(mset->error_count),
+		mset->nr_mapped_chunks, dmz_plural(mset->nr_mapped_chunks),
+		mset->nr_buf_chunks);
 
 	if (dmz_repair_dev(dev)) {
 		ret = dmz_write_map_blocks(dev, mset);
@@ -438,8 +439,7 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 	if (bad_bits)
 		dmz_verr(dev, ind,
 			 "Zone %u: unmapped zone but %u block%s valid\n",
-			 zone_id, bad_bits,
-			 (bad_bits > 1) ? "s" : "");
+			 zone_id, bad_bits, dmz_plural(bad_bits));
 
 	if (dmz_repair_dev(dev) && errors) {
 		ret = dmz_write_zone_bitmap(dev, mset, zone_id, buf);
@@ -465,12 +465,12 @@ out:
 }
 
 /*
- * Check a sequential zone bitmap.
+ * Check the bitmap of an mapped zone: applies to only data zones all blocks should be invalid.
  */
-static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
-				     struct dmz_meta_set *mset,
-				     struct blk_zone *zone,
-				     unsigned int bzone_id)
+static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
+					struct dmz_meta_set *mset,
+					struct blk_zone *zone,
+					unsigned int bzone_id)
 {
 	unsigned int b, wp_block;
 	int ret = 0, ind = 4;
@@ -478,6 +478,16 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 	unsigned int bad_bits;
 	int errors = 0;
 	__u8 *dbuf, *bbuf = NULL;
+
+	/*
+	 * Ignore buffer zones as they are checked
+	 * together with the sequential data zone they buffer.
+	 * Also ignore unbuffered data zones that are not sequential
+	 * write required zones.
+	 */
+	if (dzone_id == bzone_id ||
+	    (dmz_zone_rnd(zone) && (bzone_id == DMZ_MAP_UNMAPPED)))
+		return 0;
 
 	/* Read in the zone bitmap */
 	ret = dmz_read_zone_bitmap(dev, mset, dzone_id, &dbuf);
@@ -503,7 +513,7 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 		dmz_err(dev, ind,
 			"Zone %u: %u block%s valid after zone wp block %u\n",
 			dzone_id,
-			bad_bits, (bad_bits > 1) ? "s" : "",
+			bad_bits, dmz_plural(bad_bits),
 			wp_block);
 
 	if (bzone_id != DMZ_MAP_UNMAPPED) {
@@ -530,7 +540,7 @@ static int dmz_check_seq_zone_bitmap(struct dmz_dev *dev,
 			dmz_err(dev, ind,
 				"Zone %u: %u block%s also marked as valid in buffer zone %u\n",
 				dzone_id,
-				bad_bits, (bad_bits > 1) ? "s" : "",
+				bad_bits, dmz_plural(bad_bits),
 				bzone_id);
 
 		free(bbuf);
@@ -579,6 +589,7 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	struct blk_zone *zone;
 	unsigned int chunk, bzone_id;
 	unsigned int i, unmapped_zones = 0;
+	unsigned int mapped_zones = 0;
 	int ind = 2;
 	int ret;
 
@@ -598,36 +609,36 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 		zone = &dev->zones[i];
 
 		chunk = dmz_get_zone_mapping(dev, mset, zone, &bzone_id);
+
 		if (chunk == DMZ_MAP_UNMAPPED) {
 			ret = dmz_check_unmapped_zone_bitmap(dev, mset, zone);
 			if (ret != 0)
 				return -1;
 			unmapped_zones++;
-			continue;
-		}
-
-		if (dmz_zone_seq_req(zone)) {
-			ret = dmz_check_seq_zone_bitmap(dev, mset,
-							zone, bzone_id);
+		} else {
+			ret = dmz_check_mapped_zone_bitmap(dev, mset,
+							   zone, bzone_id);
 			if (ret != 0)
 				return -1;
+			mapped_zones++;
 		}
 
 	}
 
 	if (mset->error_count == 0) {
 		dmz_msg(dev, ind + 2,
-			"No error: %u unmapped zones checked\n",
-			unmapped_zones);
+			"No error: %u unmapped zone%s + %u mapped zone%s checked\n",
+			unmapped_zones, dmz_plural(unmapped_zones),
+			mapped_zones, dmz_plural(mapped_zones));
 		mset->flags |= DMZ_MSET_BITMAP_VALID;
 		return 0;
 	}
 
 	dmz_msg(dev, ind + 2,
-		"%u error%s found (%u unmapped zones checked)\n",
-		mset->error_count,
-		(mset->error_count > 1) ? "s" : "",
-		unmapped_zones);
+		"%u error%s found: %u unmapped zone%s + %u mapped zone%s checked)\n",
+		mset->error_count, (mset->error_count > 1) ? "s" : "",
+		unmapped_zones, dmz_plural(unmapped_zones),
+		mapped_zones, dmz_plural(mapped_zones));
 
 	mset->total_error_count += mset->error_count;
 
@@ -661,11 +672,11 @@ static int dmz_check_meta(struct dmz_dev *dev,
 	}
 
 	if (mset->flags != DMZ_MSET_VALID)
-		dmz_msg(dev, 0,
+		dmz_msg(dev, 2,
 			"%s metadata set: %u error%s found%s\n",
 			(mset->id == 0) ? "Primary" : "Secondary",
 			mset->total_error_count,
-			(mset->total_error_count > 1) ? "s" : "",
+			dmz_plural(mset->total_error_count),
 			dmz_repair_dev(dev) ? " and repaired" : "");
 
 	return 0;
@@ -981,18 +992,23 @@ static int dmz_compare_meta(struct dmz_dev *dev,
 			return -1;
 
 		if (memcmp(check_mset->buf, mset->buf, DMZ_BLOCK_SIZE) != 0) {
-			dmz_err(dev, ind + 2,
-				"%sBlock %llu differ\n",
-				(mset->error_count == 0) ? "\n" : "",
-				mset->sb_block + b);
+			dmz_verr(dev, ind + 2,
+				 "Block %llu differ\n",
+				 mset->sb_block + b);
 			mset->error_count++;
 		}
 
 	}
 
 	if (mset->error_count == 0) {
+		dmz_msg(dev, ind + 2,
+			"No error: %u blocks checked\n",
+			dev->nr_meta_blocks);
 		mset->flags = DMZ_MSET_VALID;
 	} else {
+		dmz_err(dev, ind + 2,
+			"%u block%s differ\n",
+			mset->error_count, dmz_plural(mset->error_count));
 		mset->total_error_count += mset->error_count;
 	}
 
@@ -1157,8 +1173,9 @@ int dmz_repair(struct dmz_dev *dev)
 	if (check_mset->total_error_count)
 		/* Errors found and fixed: sync metadata sets */
 		dmz_msg(dev, 0,
-			"%u errors found and repaired\n",
-			check_mset->total_error_count);
+			"%u error%s found and repaired\n",
+			check_mset->total_error_count,
+			dmz_plural(check_mset->total_error_count));
 
 	/*
 	 * If errors where found, we need to fix also the other metadata set.
