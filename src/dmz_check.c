@@ -275,7 +275,7 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 				   unsigned int chunk)
 {
 	unsigned int dzone_id, bzone_id;
-	struct blk_zone *bzone;
+	struct blk_zone *bzone, *dzone;
 	unsigned int errors = 0;
 	int ind = 4;
 
@@ -291,7 +291,7 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 			if (dmz_repair_dev(dev))
 				bzone_id = DMZ_MAP_UNMAPPED;
 		}
-		return errors;
+		goto out;
 	}
 
 	/* This is a mapped chunk */
@@ -307,25 +307,39 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	if (bzone_id == DMZ_MAP_UNMAPPED)
 		goto out;
 
-	/* This is a mapped and buffered chunk */
-	if (bzone_id == dzone_id ||
-	    bzone_id >= dev->nr_zones) {
+	dzone = &dev->zones[dzone_id];
+	if (dmz_zone_rnd(dzone)) {
 		dmz_err(dev, ind,
-			"Chunk %u: invalid buffer zone ID %u\n",
+			"Chunk %u: unexpected buffer zone ID %u\n",
 			chunk, dzone_id);
 		errors++;
 		if (dmz_repair_dev(dev))
 			bzone_id = DMZ_MAP_UNMAPPED;
 	}
 
-	bzone = &dev->zones[bzone_id];
-	if (!dmz_zone_rnd(bzone)) {
-		dmz_err(dev, ind,
-			"Chunk %u: buffer zone %u is not a random zone\n",
-			chunk, bzone_id);
-		errors++;
-		if (dmz_repair_dev(dev))
-			bzone_id = DMZ_MAP_UNMAPPED;
+	/* This is a mapped and buffered chunk */
+	if(bzone_id != DMZ_MAP_UNMAPPED) {
+		if (bzone_id == dzone_id ||
+		    bzone_id >= dev->nr_zones) {
+			dmz_err(dev, ind,
+				"Chunk %u: invalid buffer zone ID %u\n",
+				chunk, dzone_id);
+			errors++;
+			if (dmz_repair_dev(dev))
+				bzone_id = DMZ_MAP_UNMAPPED;
+		}
+	}
+
+	if(bzone_id != DMZ_MAP_UNMAPPED) {
+		bzone = &dev->zones[bzone_id];
+		if (!dmz_zone_rnd(bzone)) {
+			dmz_err(dev, ind,
+				"Chunk %u: buffer zone %u is not a random zone\n",
+				chunk, bzone_id);
+			errors++;
+			if (dmz_repair_dev(dev))
+				bzone_id = DMZ_MAP_UNMAPPED;
+		}
 	}
 
 out:
@@ -516,7 +530,8 @@ static void dmz_get_zone_mapping(struct dmz_dev *dev, struct dmz_meta_set *mset,
 
 	for (c = 0; c < dev->nr_chunks; c++) {
 		dmz_get_chunk_mapping(dev, mset, c, &dzone_id, bzone_id);
-		if (dzone_id == dmz_zone_id(dev, zone)) {
+		if (dzone_id == dmz_zone_id(dev, zone) ||
+			*bzone_id == dmz_zone_id(dev, zone)) {
 			*chunk = c;
 			return;
 		}
@@ -635,8 +650,11 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 
 	/* Read block */
 	ret = dmz_read_block(dev, mset->sb_block, mset->buf);
-	if (ret != 0)
-		return -1;
+	if (ret != 0) {
+		/* Need a new line to end previous print out */
+		dmz_msg(dev, 0, "\n");
+		goto err;
+	}
 
 	/* Check magic */
 	if (__le32_to_cpu(sb->magic) != DMZ_MAGIC) {
@@ -651,8 +669,9 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	sb->crc = 0;
 	calculated_crc = dmz_crc32(sb->gen, mset->buf, DMZ_BLOCK_SIZE);
 	if (calculated_crc != stored_crc) {
-		printf("invalid crc (expected 0x%08x, read 0x%08x)\n",
-		       calculated_crc, stored_crc);
+		dmz_err(dev, 0,
+			"invalid crc (expected 0x%08x, read 0x%08x)\n",
+			calculated_crc, stored_crc);
 		goto err;
 	}
 
@@ -1041,7 +1060,7 @@ static int dmz_repair_sync_meta(struct dmz_dev *dev,
 	/* Write super block in destination */
 	if (dst_mset->id != 0)
 		dst_sb_offset = dev->zone_nr_blocks * dev->nr_meta_zones;
-	ret = dmz_write_super(dev, dst_sb_offset);
+	ret = dmz_write_super(dev, src_mset->gen, dst_sb_offset);
 	if (ret != 0)
 		return -1;
 

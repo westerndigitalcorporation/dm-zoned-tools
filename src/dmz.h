@@ -322,7 +322,7 @@ extern int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
 extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
 extern int dmz_locate_metadata(struct dmz_dev *dev);
-extern int dmz_write_super(struct dmz_dev *dev, __u64 offset);
+extern int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
 extern int dmz_format(struct dmz_dev *dev);
 extern int dmz_check(struct dmz_dev *dev);
 extern int dmz_repair(struct dmz_dev *dev);

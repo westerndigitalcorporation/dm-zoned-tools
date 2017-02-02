@@ -29,11 +29,10 @@
  * Fill and write a super block.
  */
 int dmz_write_super(struct dmz_dev *dev,
-		    __u64 offset)
+		    __u64 gen, __u64 offset)
 {
 	__u64 sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
-	__u64 gen = 1;
 	__u32 crc;
 	__u8 *buf;
 	int ret;
@@ -175,7 +174,7 @@ static int dmz_write_meta(struct dmz_dev *dev,
 
 	/* Write super block */
 	printf("  Writing super block\n");
-	if (dmz_write_super(dev, offset) < 0)
+	if (dmz_write_super(dev, 1, offset) < 0)
 		return -1;
 
 	return 0;
