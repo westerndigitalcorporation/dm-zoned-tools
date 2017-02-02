@@ -897,7 +897,7 @@ static struct dmz_meta_set *dmz_validate_meta_set(struct dmz_dev *dev,
 }
 
 /*
- * Comapre one metadata set against the other.
+ * Compare one metadata set against the other.
  */
 static int dmz_compare_meta(struct dmz_dev *dev,
 			    struct dmz_meta_set *check_mset,
