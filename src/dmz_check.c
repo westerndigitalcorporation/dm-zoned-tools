@@ -282,6 +282,19 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 
 	dmz_get_chunk_mapping(dev, mset, chunk, &dzone_id, &bzone_id);
 
+	if (dzone_id != DMZ_MAP_UNMAPPED) {
+		/* This is a mapped chunk */
+		mset->nr_mapped_chunks++;
+		if (dzone_id >= dev->nr_zones) {
+			dmz_err(dev, ind,
+				"Chunk %u: invalid data zone %u\n",
+				chunk, dzone_id);
+			errors++;
+			if (dmz_repair_dev(dev))
+				dzone_id = DMZ_MAP_UNMAPPED;
+		}
+	}
+
 	if (dzone_id == DMZ_MAP_UNMAPPED) {
 		/* Unmapped chunk: there should be no buffer zone */
 		if (bzone_id != DMZ_MAP_UNMAPPED) {
@@ -295,31 +308,35 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 		goto out;
 	}
 
-	/* This is a mapped chunk */
-	mset->nr_mapped_chunks++;
-	if (dzone_id >= dev->nr_zones) {
-		dmz_err(dev, ind,
-			"Chunk %u: invalid data zone %u\n",
-			chunk, dzone_id);
-		errors++;
-		if (dmz_repair_dev(dev))
-			dzone_id = DMZ_MAP_UNMAPPED;
+	if (bzone_id == DMZ_MAP_UNMAPPED) {
+		dzone = &dev->zones[dzone_id];
+		if (dmz_zone_seq_req(dzone) && dmz_zone_empty(dzone)) {
+			dmz_err(dev, ind,
+				"Chunk %u: mapped to empty seq req zone %u\n",
+				chunk, dzone_id);
+			if (dmz_repair_dev(dev)) {
+				/* Only count as error in repair mode */
+				errors++;
+				dzone_id = DMZ_MAP_UNMAPPED;
+			}
+		}
+		goto out;
 	}
 
-	if (bzone_id == DMZ_MAP_UNMAPPED)
-		goto out;
-
 	/* This is a mapped and buffered chunk */
-	mset->nr_buf_chunks++;
-	dzone = &dev->zones[dzone_id];
-	if (dmz_zone_rnd(dzone)) {
-		dmz_err(dev, ind,
-			"Chunk %u: mapped to random zone %u but using buffer zone %u\n",
-			chunk, dzone_id, bzone_id);
-		errors++;
-		if (dmz_repair_dev(dev)) {
-			bzone_id = DMZ_MAP_UNMAPPED;
-			goto out;
+	if (dzone_id < dev->nr_zones) {
+		mset->nr_buf_chunks++;
+		dzone = &dev->zones[dzone_id];
+		if (dmz_zone_rnd(dzone)) {
+			dmz_err(dev, ind,
+				"Chunk %u: mapped to random zone %u "
+				"but using buffer zone %u\n",
+				chunk, dzone_id, bzone_id);
+			errors++;
+			if (dmz_repair_dev(dev)) {
+				bzone_id = DMZ_MAP_UNMAPPED;
+				goto out;
+			}
 		}
 	}
 
@@ -329,10 +346,9 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 			"Chunk %u: invalid buffer zone %u\n",
 			chunk, dzone_id);
 		errors++;
-		if (dmz_repair_dev(dev)) {
+		if (dmz_repair_dev(dev))
 			bzone_id = DMZ_MAP_UNMAPPED;
-			goto out;
-		}
+		goto out;
 	}
 
 	bzone = &dev->zones[bzone_id];
