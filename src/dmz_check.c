@@ -295,16 +295,15 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 		}
 	}
 
-	if (dzone_id == DMZ_MAP_UNMAPPED) {
-		/* Unmapped chunk: there should be no buffer zone */
-		if (bzone_id != DMZ_MAP_UNMAPPED) {
-			dmz_err(dev, ind,
-				"Chunk %u: unmapped but buffer zone %u set\n",
-				chunk, bzone_id);
-			errors++;
-			if (dmz_repair_dev(dev))
-				bzone_id = DMZ_MAP_UNMAPPED;
-		}
+	if (dzone_id == DMZ_MAP_UNMAPPED &&
+	    bzone_id != DMZ_MAP_UNMAPPED) {
+		/* Unmapped chunk should not have a buffer zone */
+		dmz_err(dev, ind,
+			"Chunk %u: unmapped but buffer zone %u set\n",
+			chunk, bzone_id);
+		errors++;
+		if (dmz_repair_dev(dev))
+			bzone_id = DMZ_MAP_UNMAPPED;
 		goto out;
 	}
 
