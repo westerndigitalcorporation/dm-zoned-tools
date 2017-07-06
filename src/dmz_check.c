@@ -465,8 +465,9 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 
 	if (dmz_zone_seq_req(zone) && zone->wp != zone->start) {
 		dmz_err(dev, ind,
-			"Zone %u: unmapped sequential zone not empty\n",
-			zone_id);
+			"Zone %u: unmapped sequential zone not empty (wp at +%u blocks)\n",
+			zone_id,
+			(unsigned int)dmz_sect2blk(zone->wp - zone->start));
 		errors++;
 		if (dmz_repair_dev(dev))
 			/* Reset zone */
