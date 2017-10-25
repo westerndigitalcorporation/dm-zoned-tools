@@ -49,6 +49,7 @@ static void dmzadm_usage(void)
  */
 int main(int argc, char **argv)
 {
+	unsigned int nr_zones;
 	struct dmz_dev dev;
 	int i, ret;
 	enum dmz_op op;
@@ -141,10 +142,18 @@ int main(int argc, char **argv)
 	       (dev.capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
 	printf("  Host-%s device\n",
 	       (dev.flags & DMZ_ZONED_HM) ? "managed" : "aware");
+	nr_zones = dev.capacity / dev.zone_nr_sectors;
 	printf("  %u zones of %zu 512-byte sectors (%zu MiB)\n",
-	       dev.nr_zones,
+	       nr_zones,
 	       dev.zone_nr_sectors,
 	       (dev.zone_nr_sectors << 9) / (1024 * 1024));
+	if (nr_zones < dev.nr_zones) {
+		size_t runt_sectors = dev.capacity & (dev.zone_nr_sectors - 1);
+
+		printf("  1 runt zone of %zu 512-byte sectors (%zu MiB)\n",
+		       runt_sectors,
+		       (runt_sectors << 9) / (1024 * 1024));
+	}
 	printf("  %zu 4KB data blocks per zone\n",
 	       dev.zone_nr_blocks);
 
