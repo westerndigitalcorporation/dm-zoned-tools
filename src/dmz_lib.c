@@ -120,6 +120,12 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 			continue;
 		}
 
+		if (dmz_zone_length(zone) != dev->zone_nr_sectors) {
+			printf("%s: Ignoring runt zone %u\n",
+			       dev->name,
+			       dmz_zone_id(dev, zone));
+			continue;
+		}
 		dev->nr_useable_zones++;
 
 		if (dmz_zone_rnd(zone)) {
