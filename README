@@ -23,7 +23,7 @@ http://www.t13.org/Documents/UploadedDocuments/docs2015/
 di537r05-Zoned_Device_ATA_Command_Set_ZAC.pdf
 
 dm-zoned implementation focused on simplicity and on minimizing overhead (CPU,
-memory and storage overhead). For a 10TB host-manmaged disk with 256 MB zones,
+memory and storage overhead). For a 10TB host-managed disk with 256 MB zones,
 dm-zoned memory usage per disk instance is at most 4.5 MB and as little as 5
 zones will be used internally for storing metadata and performaing reclaim
 operations.
