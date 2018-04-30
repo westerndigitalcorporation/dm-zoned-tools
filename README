@@ -184,7 +184,7 @@ options="$@"
 
 modprobe dm-zoned
 
-echo "0 `blockdev --getsize ${dev}` dm-zoned ${dev} ${options}" | \
+echo "0 `blockdev --getsize ${dev}` zoned ${dev} ${options}" | \
 dmsetup create zoned-`basename ${dev}`
 ]]
 
