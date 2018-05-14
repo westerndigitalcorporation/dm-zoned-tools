@@ -12,6 +12,10 @@ system or an application doing raw block device accesses) any sequential write
 constraint on host-managed devices and can mitigate potential device-side
 performance degradation with host-aware zoned devices.
 
+File systems or applications that can natively support host-managed zoned block
+devices (e.g. the f2fs file system since kernel 4.10) do not need to use the
+dm-zoned device mapper.
+
 For a more detailed description of the zoned block device models and
 their constraints see (for SCSI devices):
 
@@ -31,7 +35,12 @@ operations.
 I.2 dm-zoned-tools
 ------------------
 
-dm-zoned backend devices can be formatted and checked using the dmzadm utility.
+The dmzadm utility formats backend devices used with the dm-zoned device mapper.
+This utility will inspect the device verifying that the device is a zoned block
+device and will prepare and write on-disk dm-zoned metadata according to the
+device capacity, zone size, etc.
+
+dmzadm usage is as follows:
 
 Usage: dmzadm <operation> <device path> [options]
 Operations:
