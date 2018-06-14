@@ -168,7 +168,15 @@ Options:
                      reclaiming random zones if the percentage of
                      free random data zones falls below <perc>.
 
-V. Example scripts
+V. Udev zone disk deployment
+============================
+
+A udev rule is provided which enables you to set the IO scheduler, blacklist
+driver to run dmsetup, and runs dmsetup for the rest of the zone drivers.
+If you use this udev rule the below script is not needed. Be sure to mkfs only
+on the resulting /dev/mapper/zone-$serial device you end up with.
+
+VI. Example scripts
 ==================
 
 [[

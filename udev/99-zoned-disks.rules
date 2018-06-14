@@ -1,0 +1,78 @@
+# To use a zone disks first thing you need to:
+#
+# 1) Enable zone disk support in your kernel
+# 2) Use the deadline or mq-deadline scheduler for it - mandated as of v4.16
+# 3) Blacklist devices dedicated for f2fs as of v4.10
+# 4) Run dmsetup other disks
+# 5) Create the filesystem -- NOTE: use mkfs /dev/mapper/zone-serial if
+#    you enabled use dmsetup on the disk.
+# 6) Consider using nofail mount option in case you run an supported kernel
+#
+# You can use this udev rules file for 2) 3) and 4). Further details below.
+#
+# 1) Enable zone disk support in your kernel
+#
+#    o CONFIG_BLK_DEV_ZONED
+#    o CONFIG_DM_ZONED
+#
+# This will let the kernel actually see these devices, ie, via fdisk /dev/sda
+# for instance. Run:
+#
+# 	dmzadm --format /dev/sda
+
+# 2) Set deadline or mq-deadline for all disks which are zoned
+#
+# Zoned disks can only work with the deadline or mq-deadline scheduler. This is
+# mandated for all SMR drives since v4.16. It has been determined this must be
+# done through a udev rule, and the kernel should not set this up for disks.
+# This magic will have to live for *all* zoned disks.
+# XXX: what about distributions that want mq-deadline ? Probably easy for now
+#      to assume deadline and later have a mapping file to enable
+#      mq-deadline for specific serial devices?
+ACTION=="add|change", KERNEL=="sd*[!0-9]", ATTRS{queue/zoned}=="host-managed", \
+	ATTR{queue/scheduler}="deadline"
+
+# 3) Blacklist f2fs devices as of v4.10
+# We don't have to run dmsetup on on disks where you want to use f2fs, so you
+# can use this rule to skip dmsetup for it. First get the serial short number.
+#
+#	udevadm info --name=/dev/sda  | grep -i serial_shor
+# XXX: To generalize this for distributions consider using INPUT{db} to or so
+# and then use that to check if the serial number matches one on the database.
+#ACTION=="add", SUBSYSTEM=="block", ENV{ID_SERIAL_SHORT}=="XXA1ZFFF", GOTO="zone_disk_group_end"
+
+# 4) We need to run dmsetup if you want to use other filesystems
+#
+# dmsetup is not persistent, so it needs to be run on upon every boot.  We use
+# the device serial number for the /dev/mapper/ name.
+ACTION=="add", KERNEL=="sd*[!0-9]", ATTRS{queue/zoned}=="host-managed", \
+	RUN+="/sbin/dmsetup create zoned-$env{ID_SERIAL_SHORT} --table '0 %s{size} zoned $devnode'", $attr{size}
+
+# 4) Create a filesystem for the device
+#
+# Be 100% sure you use /dev/mapper/zone-$YOUR_DEVICE_SERIAL for the mkfs
+# command as otherwise things can break.
+#
+# XXX: preventing the above proactively in the kernel would be ideal however
+# this may be hard.
+#
+# Once you create the filesystem it will get a UUID.
+#
+# Find out what UUID is, you can do this for instance if your zoned disk is
+# your second device-mapper device, ie dm-1 by:
+#
+# 	ls -l /dev/disk/by-uuid/dm-1
+#
+# To figure out which dm-$number it is, use dmsetup info, the minor number
+# is the $number.
+#
+# 5) Add an etry in /etc/fstab with nofail for example:
+#
+# UUID=99999999-aaaa-bbbb-c1234aaaabbb33456 /media/monster xfs nofail 0 0
+#
+# nofail will ensure system boots fine even if you boot into a kernel which
+# lacks support for the device and so it is not found. Since the UUID will
+# always match the device we don't care if the device moves around the bus
+# on the system. We just need to get the UUID once.
+
+LABEL="zone_disk_group_end"
