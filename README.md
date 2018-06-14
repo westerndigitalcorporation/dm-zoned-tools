@@ -1,10 +1,10 @@
 Copyright (C) 2016, Western Digital.
 
-I. Introduction
-===============
+# <p align="center">dm-zoned Device Mapper Userspace Tool</p>
 
-I.1. dm-zoned
--------------
+## I. Introduction
+
+### I.1. dm-zoned Device Mapper
 
 The dm-zoned device mapper provides transparent write access to zoned block
 devices (ZBC and ZAC compliant devices). It hides to the device user (a file
@@ -23,8 +23,7 @@ http://www.t10.org/drafts.htm#ZBC_Family
 
 and (for ATA devices):
 
-http://www.t13.org/Documents/UploadedDocuments/docs2015/
-di537r05-Zoned_Device_ATA_Command_Set_ZAC.pdf
+http://www.t13.org/Documents/UploadedDocuments/docs2015/di537r05-Zoned_Device_ATA_Command_Set_ZAC.pdf
 
 dm-zoned implementation focused on simplicity and on minimizing overhead (CPU,
 memory and storage overhead). For a 10TB host-managed disk with 256 MB zones,
@@ -32,32 +31,14 @@ dm-zoned memory usage per disk instance is at most 4.5 MB and as little as 5
 zones will be used internally for storing metadata and performaing reclaim
 operations.
 
-I.2 dm-zoned-tools
-------------------
+### I.2 dm-zoned Userspace Tool
 
 The dmzadm utility formats backend devices used with the dm-zoned device mapper.
 This utility will inspect the device verifying that the device is a zoned block
 device and will prepare and write on-disk dm-zoned metadata according to the
 device capacity, zone size, etc.
 
-dmzadm usage is as follows:
-
-Usage: dmzadm <operation> <device path> [options]
-Operations:
-  --help | -h	: General help message
-  --format	: Format a block device metadata
-  --check	: Check a block device metadata
-  --repair	: Repair a block device metadata
-Common options(all operations):
-  --verbose	: Verbose output
-  --vverbose	: Very verbose output
-Format options:
-  --seq <num>	: Number of sequential zones reserved
-	          for reclaim. The minimum is 1 and the
-		  default is 16
-
-I.3. License
-------------
+### I.3. License
 
 dm-zoned-tools is distributed under the terms of the the terms of the GNU
 General Public License version 3, or any later version. A copy of version 3 of
@@ -70,8 +51,15 @@ of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 Along with dm-zoned-tools, you should have received a copy of the GNU 
 General Public License version 3. If not, see <http://www.gnu.org/licenses/>.
 
-II. Algorithm
-=============
+### I.4. Contact and Bug Reports
+
+To report problems, please contact:
+* Damien Le Moal  (damien.lemoal@wdc.com)
+
+PLEASE DO NOT SUBMIT CONFIDENTIAL INFORMATION OR INFORMATION SPECIFIC
+TO DRIVES THAT ARE VENDOR SAMPLES OR NOT PUBLICLY AVAILABLE.
+
+## II. Algorithm
 
 dm-zoned implements an on-disk buffering scheme to handle non-sequential write
 accesses to a zoned device sequential zones. Conventional zones are used for
@@ -146,40 +134,90 @@ and updated and normal operation resumed. This only temporarily delays write and
 discard requests. Read requests can be processed while metadata logging is
 executed.
 
-IV. Usage
-=========
+## III. Compilation and Installation
 
-A zoned block device must first be formatted using the dmzadm tool. This will
-analyze the device zone configuration, determine where to place the metadata
-sets and initialize on disk metadata blocks.
+The following commands will compile the dmzadm tool (requires the autoconf,
+automake and libtool packages).
 
-Ex:
+```
+> sh ./autogen.sh
+> ./configure
+> make
+```
 
-dmzadm --format /dev/sdxx
+To install the compiled dmzadm executable file, simply execute as root the
+following command.
 
-For a formatted device, the target can be created normally with the dmsetup
-utility. The following options can be passed to initialize the target.
+```
+> make install
+```
 
-Parameters: <zoned block device path> [Options]
-Options:
-  rlow=<perc>      : Start reclaiming random zones if the percentage
-		     of free random data zones falls below <perc>.
-  idle_rlow=<perc> : When the disk is idle (no I/O activity), start
-                     reclaiming random zones if the percentage of
-                     free random data zones falls below <perc>.
+The default installation directory is /usr/sbin. This default location can be
+changed using the configure script. Executing the following command displays
+the options used to control the installation path.
 
-V. Udev zone disk deployment
-============================
+```
+> ./configure --help
+```
+
+## IV. Usage
+
+The dm-zoned device mapper is included with the Linux kernel code since version
+4.13.0. dm-zoned module compilation must be enabled in the kernel configuration.
+This can be done by setting the CONFIG_DM_ZONED configuration parameter to "y"
+or "m" (menu: Device Derivers -> Multiple devices driver support (RAID and LVM)
+-> Drive-managed zoned block device target support).
+
+To use dm-zoned, a zoned block device must first be formatted using the dmzadm
+tool. This tool will analyze the device zone configuration, determine where to
+place the metadata sets and initialize on disk metadata blocks.
+
+Example:
+
+```
+> dmzadm --format /dev/sdxx
+```
+
+dmzadm detailed usage is as follows:
+
+```
+> dmzadm --help
+Usage: dmzadm <operation> <device path> [options]
+Operations:
+	--help | -h	: General help message
+	--format	: Format a block device metadata
+	--check	: Check a block device metadata
+	--repair	: Repair a block device metadata
+Common options(all operations):
+	--verbose	: Verbose output
+	--vverbose	: Very verbose output
+Format options:
+	--seq <num>	: Number of sequential zones reserved for reclaim.
+			  The minimum is 1 and the default is 16
+```
+
+For a zoned block device alread formatted, the dm-zoned target can be created
+normally with the dmsetup utility (see example script below).
+
+The following options can be passed to dmsetup to initialize the target.
+
+Option        | Description
+--------------|-------------------------------------------------
+rlow=int      | Start reclaiming random zones if the percentage of free random data zones falls below the specified percentage.
+idle_rlow=int | When the disk is idle (no I/O activity), start reclaiming random zones if the percentage of free random data zones falls below the specified percentage.
+
+## V. Udev zone disk deployment
 
 A udev rule is provided which enables you to set the IO scheduler, blacklist
 driver to run dmsetup, and runs dmsetup for the rest of the zone drivers.
 If you use this udev rule the below script is not needed. Be sure to mkfs only
 on the resulting /dev/mapper/zone-$serial device you end up with.
 
-VI. Example scripts
-==================
+See udev/99-zoned-disks.rules.
 
-[[
+## VI. Example Setup Scripts
+
+```
 #!/bin/sh
 
 if [ $# -lt 1 ]; then
@@ -203,5 +241,5 @@ modprobe dm-zoned
 
 echo "0 `blockdev --getsize ${dev}` zoned ${dev} ${options}" | \
 dmsetup create zoned-`basename ${dev}`
-]]
+```
 
