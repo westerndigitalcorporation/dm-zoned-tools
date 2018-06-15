@@ -87,14 +87,23 @@ static int dmz_dev_busy(struct dmz_dev *dev)
  */
 static int dmz_get_dev_model(struct dmz_dev *dev)
 {
-	char str[128];
+	char str[PATH_MAX];
 	FILE *file;
 	int res;
+	int len;
 
 	/* Check that this is a zoned block device */
-	snprintf(str, sizeof(str),
+	len = snprintf(str, sizeof(str),
 		 "/sys/block/%s/queue/zoned",
 		 dev->name);
+
+	/* Indicates truncation */
+	if (len >= PATH_MAX) {
+		fprintf(stderr, "name %s failed: %s\n", str,
+			strerror(ENAMETOOLONG));
+		return -1;
+	}
+
 	file = fopen(str, "r");
 	if (!file) {
 		fprintf(stderr, "Open %s failed\n", str);
