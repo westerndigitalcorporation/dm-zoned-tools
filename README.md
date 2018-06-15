@@ -256,3 +256,14 @@ echo "0 `blockdev --getsize ${dev}` zoned ${dev} ${options}" | \
 dmsetup create zoned-`basename ${dev}`
 ```
 
+## VI. Submitting patches
+
+Read CONTRIBUTING and send patches to:
+
+	Damien Le Moal <damien.lemoal@wdc.com>
+	Bart Van Assche <Bart.VanAssche@wdc.com>
+
+If you believe this requires kernel eyes or review Cc the device mapper kernel
+development mailing list:
+
+	dm-devel@redhat.com
