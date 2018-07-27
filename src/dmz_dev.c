@@ -96,8 +96,8 @@ static int dmz_get_dev_model(struct dmz_dev *dev)
 
 	/* Check that this is a zoned block device */
 	len = snprintf(str, sizeof(str),
-		 "/sys/block/%s/queue/zoned",
-		 dev->name);
+		       "/sys/block/%s/queue/zoned",
+		       dev->name);
 
 	/* Indicates truncation */
 	if (len >= PATH_MAX) {

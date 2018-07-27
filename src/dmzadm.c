@@ -64,8 +64,9 @@ int main(int argc, char **argv)
 	if (argc < 2 ||
 	    strcmp(argv[1], "--help") == 0 ||
 	    strcmp(argv[1], "-h") == 0) {
-		printf("dmzadm is for formatting, checking and repairing a zoned\n"
-		       "block device for use with the dm-zoned device mapper.\n");
+		printf("dmzadm allows formatting, checking and repairing\n"
+		       "a zoned block device for use with the dm-zoned\n"
+		       "device mapper.\n");
 		dmzadm_usage();
 		return 0;
 	}

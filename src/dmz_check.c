@@ -398,7 +398,8 @@ static int dmz_check_mapping(struct dmz_dev *dev,
 	if (mset->error_count == 0) {
 		dmz_msg(dev, ind + 2,
 			"No error: %u mapped chunk%s (%u buffered) checked\n",
-			mset->nr_mapped_chunks, dmz_plural(mset->nr_mapped_chunks),
+			mset->nr_mapped_chunks,
+			dmz_plural(mset->nr_mapped_chunks),
 			mset->nr_buf_chunks);
 		mset->flags |= DMZ_MSET_MAP_VALID;
 		return 0;
@@ -465,7 +466,8 @@ static int dmz_check_unmapped_zone_bitmap(struct dmz_dev *dev,
 
 	if (dmz_zone_seq_req(zone) && zone->wp != zone->start) {
 		dmz_err(dev, ind,
-			"Zone %u: unmapped sequential zone not empty (wp at +%u blocks)\n",
+			"Zone %u: unmapped sequential zone not empty "
+			"(wp at +%u blocks)\n",
 			zone_id,
 			(unsigned int)dmz_sect2blk(zone->wp - zone->start));
 		errors++;
@@ -482,7 +484,8 @@ out:
 }
 
 /*
- * Check the bitmap of an mapped zone: applies to only data zones all blocks should be invalid.
+ * Check the bitmap of an mapped zone: applies to only data zones all
+ * blocks should be invalid.
  */
 static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 					struct dmz_meta_set *mset,
@@ -556,7 +559,8 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 			if (dmz_test_bit(dbuf, b)) {
 				bad_bits++;
 				dmz_verr(dev, ind,
-					 "Zone %u: block %u valid in buffer zone %u\n",
+					 "Zone %u: block %u valid in buffer "
+					 "zone %u\n",
 					 dzone_id, b, bzone_id);
 				errors++;
 				if (dmz_repair_dev(dev))
@@ -571,7 +575,8 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 		if (bad_bits)
 			dmz_err(dev, ind,
 				"Zone %u: mapped to chunk %u, weight %u, "
-				"%u valid block%s overlap with buffer zone %u (weight %u)\n",
+				"%u valid block%s overlap with buffer zone %u "
+				"(weight %u)\n",
 				dzone_id, chunk, dzone_weight,
 				bad_bits, dmz_plural(bad_bits),
 				bzone_id,
@@ -661,7 +666,8 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 
 	if (mset->error_count == 0) {
 		dmz_msg(dev, ind + 2,
-			"No error: %u unmapped zone%s + %u mapped zone%s checked\n",
+			"No error: %u unmapped zone%s + %u mapped zone%s "
+			"checked\n",
 			unmapped_zones, dmz_plural(unmapped_zones),
 			mapped_zones, dmz_plural(mapped_zones));
 		mset->flags |= DMZ_MSET_BITMAP_VALID;
@@ -669,7 +675,8 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	}
 
 	dmz_msg(dev, ind + 2,
-		"%u error%s found: %u unmapped zone%s + %u mapped zone%s checked\n",
+		"%u error%s found: %u unmapped zone%s + %u mapped zone%s "
+		"checked\n",
 		mset->error_count, (mset->error_count > 1) ? "s" : "",
 		unmapped_zones, dmz_plural(unmapped_zones),
 		mapped_zones, dmz_plural(mapped_zones));
@@ -821,7 +828,8 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 		dmz_err(dev, 0,
 			"invalid number of zone bitmap blocks "
 			"(expected %u, read %u)\n",
-			dev->nr_bitmap_blocks, __le32_to_cpu(sb->nr_bitmap_blocks));
+			dev->nr_bitmap_blocks,
+			__le32_to_cpu(sb->nr_bitmap_blocks));
 		goto err;
 	}
 
@@ -940,7 +948,8 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 				continue;
 			if (dmz_block_is_sb(mset[1].buf)) {
 				dmz_msg(dev, ind + 2,
-					"Secondary super block found at block %llu\n",
+					"Secondary super block found at "
+					"block %llu\n",
 					mset[1].sb_block);
 				break;
 			}
@@ -1100,7 +1109,8 @@ int dmz_check(struct dmz_dev *dev)
 			}
 		} else {
 			dmz_msg(dev, 0,
-				"%s metadata set generation differs: not checking\n",
+				"%s metadata set generation differs: not "
+				"checking\n",
 				(id == 0) ? "Primary" : "Secondary");
 		}
 
