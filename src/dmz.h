@@ -142,6 +142,7 @@ struct dm_zoned_map {
 #define DMZ_REPAIR  		0x00000004
 #define DMZ_ZONED_HA		0x00000010
 #define DMZ_ZONED_HM		0x00000020
+#define DMZ_OVERWRITE		0x00000040
 
 /*
  * Operations.
@@ -314,7 +315,7 @@ dmz_zone_cond_str(struct blk_zone *zone)
 #define dmz_zone_need_reset(z)	(int)(z)->reset
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
-extern int dmz_open_dev(struct dmz_dev *dev);
+extern int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op);
 extern void dmz_close_dev(struct dmz_dev *dev);
 extern int dmz_sync_dev(struct dmz_dev *dev);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);

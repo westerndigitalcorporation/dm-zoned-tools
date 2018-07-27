@@ -1,4 +1,3 @@
-
 AC_INIT([dm-zoned tools], [1.0.1], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)
@@ -28,8 +27,14 @@ AC_CHECK_HEADER(mntent.h, [],
 		[AC_MSG_ERROR([Couldn't find mntent.h])])
 AC_CHECK_HEADER(linux/fs.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/fs.h])])
+AC_CHECK_HEADER(blkid/blkid.h, [],
+		[AC_MSG_ERROR([Couldn't find blkid/blkid.h])])
 AC_CHECK_HEADER(linux/blkzoned.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/blkzoned.h])])
+
+# Checks for libraries.
+AC_SEARCH_LIBS([blkid_do_fullprobe], [blkid], [],
+	       [AC_MSG_ERROR([Couldn't find libblkid])])
 
 AC_CONFIG_FILES([
 	Makefile

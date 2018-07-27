@@ -38,6 +38,7 @@ static void dmzadm_usage(void)
 	       "  --vverbose	: Very verbose output\n");
 
 	printf("Format operation options\n"
+	       "  --force	: Force overwrite of existing content\n"
 	       "  --seq <num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
@@ -117,6 +118,17 @@ int main(int argc, char **argv)
 				return 1;
 			}
 
+		} else if (strcmp(argv[i], "--force") == 0) {
+
+			if (op != DMZ_OP_FORMAT) {
+				fprintf(stderr,
+					"--force option is valid only with the "
+					"format operation\n");
+				return 1;
+			}
+
+			dev.flags |= DMZ_OVERWRITE;
+
 		} else if (argv[i][0] != '-') {
 
 			break;
@@ -133,7 +145,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Open the device */
-	if (dmz_open_dev(&dev) < 0)
+	if (dmz_open_dev(&dev, op) < 0)
 		return 1;
 
 	printf("%s: %llu 512-byte sectors (%llu GiB)\n",

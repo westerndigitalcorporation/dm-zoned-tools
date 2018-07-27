@@ -31,6 +31,8 @@
 #include <mntent.h>
 #include <dirent.h>
 
+#include <blkid/blkid.h>
+
 /*
  * Test if the device is mounted.
  */
@@ -358,11 +360,77 @@ static int dmz_get_dev_info(struct dmz_dev *dev)
 }
 
 /*
+ * Use libblkid to check for existing file systems on the disk.
+ * Return -1 on error, 0 if something valid is detected on the disk
+ * and 1 if the disk appears to be unused.
+ */
+static int dmz_check_overwrite(struct dmz_dev *dev)
+{
+	const char *type;
+	blkid_probe pr;
+	int ret = -1;
+
+	pr = blkid_new_probe_from_filename(dev->path);
+	if (!pr)
+		goto out;
+
+	ret = blkid_probe_enable_superblocks(pr, 1);
+	if (ret < 0)
+		goto out;
+
+	ret = blkid_probe_enable_partitions(pr, 1);
+	if (ret < 0)
+		goto out;
+
+	ret = blkid_do_fullprobe(pr);
+	if (ret < 0 || ret == 1) {
+		/* 1 means that nothing was found */
+		goto out;
+	}
+
+	/* Analyze what was found on the disk */
+	ret = blkid_probe_lookup_value(pr, "TYPE", &type, NULL);
+	if (ret == 0) {
+		fprintf(stderr,
+			"%s appears to contain an existing filesystem (%s)\n",
+			dev->path, type);
+		goto out;
+	}
+
+	ret = blkid_probe_lookup_value(pr, "PTTYPE", &type, NULL);
+	if (ret == 0) {
+		fprintf(stderr,
+			"%s appears to contain a partition table (%s)\n",
+			dev->path, type);
+		goto out;
+	}
+
+	fprintf(stderr,
+		"%s appears to contain something according to blkid\n",
+		dev->path);
+	ret = 0;
+
+out:
+	if (pr)
+		blkid_free_probe(pr);
+
+	if (ret == 0)
+		fprintf(stderr, "Use the --force option to overwrite\n");
+	else if (ret < 0)
+		fprintf(stderr,
+			"%s: probe failed, cannot detect existing filesystem\n",
+			dev->name);
+
+	return ret;
+}
+
+/*
  * Open a device.
  */
-int dmz_open_dev(struct dmz_dev *dev)
+int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 {
 	struct stat st;
+	int ret;
 
 	dev->name = basename(dev->path);
 
@@ -380,6 +448,13 @@ int dmz_open_dev(struct dmz_dev *dev)
 			"%s is not a block device\n",
 			dev->path);
 		return -1;
+	}
+
+	if (op == DMZ_OP_FORMAT && (!(dev->flags & DMZ_OVERWRITE))) {
+		/* Check for existing valid content */
+		ret = dmz_check_overwrite(dev);
+		if (ret <= 0)
+			return -1;
 	}
 
 	if (dmz_dev_mounted(dev)) {
