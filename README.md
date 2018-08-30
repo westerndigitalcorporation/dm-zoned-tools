@@ -261,7 +261,7 @@ dmsetup create zoned-`basename ${dev}`
 Read CONTRIBUTING and send patches to:
 
 	Damien Le Moal <damien.lemoal@wdc.com>
-	Bart Van Assche <Bart.VanAssche@wdc.com>
+	Matias Bjørling <matias.bjorling@wdc.com>
 
 If you believe this requires kernel eyes or review Cc the device mapper kernel
 development mailing list:
