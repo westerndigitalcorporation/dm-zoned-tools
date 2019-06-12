@@ -1,0 +1,5 @@
+dm-zoned-tools (1.0.1-0ubuntu1~1804) bionic; urgency=medium
+
+  * Initial release
+
+ -- Tj <ubuntu@iam.tj>  Wed, 12 Jun 2019 19:38:15 +0100

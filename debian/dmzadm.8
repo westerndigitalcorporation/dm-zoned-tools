@@ -1,0 +1,77 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" (C) Copyright 2019 Tj <ubuntu@iam.tj>,
+.\"
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH dmzadm 8 "June 12 2019"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+dmzadm \- zoned block device management
+.SH SYNOPSIS
+.B dmzadm
+.RI <operation>
+.RI <device-path>
+.RI [options]
+.SH DESCRIPTION
+.B dmzadm
+ allows formatting, checking and repairing
+a zoned block device for use with the 
+.B dm-zoned
+device mapper.
+.PP
+.SH OPTIONS
+.TP
+Operations
+.TP
+.B \-\-help | \-h
+General help message
+.TP
+.B \-\-format
+Format a block device metadata
+.TP
+.B \-\-check
+Check a block device metadata
+.TP
+.B \-\-repair
+Repair a block device metadata
+.TP
+General options
+.TP
+.B \-\-verbose
+Verbose output
+.TP
+.B \-\-vverbose
+Very verbose output
+.TP
+Format operation options
+.TP
+.B \-\-force
+Force overwrite of existing content
+.TP
+.B \-\-seq <num>
+Number of sequential zones reserved for reclaim. 
+The minimum is 1 and the default is 16
+.SH SEE ALSO
+https://github.com/hgst/dm-zoned-tools
+.SH BUGS
+https://github.com/hgst/dm-zoned-tools/issues
+.SH AUTHOR
+Western Digital
+.SH COPYRIGHT
+GNU General Public Licence version 3
+.PP
+ (c) 2016-2019 Western Digital
+.PP
+Manual written for Debian and Ubuntu by Tj <ubuntu@iam.tj>

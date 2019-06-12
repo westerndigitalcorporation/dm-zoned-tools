@@ -1,0 +1,16 @@
+Source: dm-zoned-tools
+Section: admin
+Priority: optional
+Maintainer: Tj <ubuntu@iam.tj>
+Build-Depends: debhelper (>= 11), libblkid-dev
+Standards-Version: 4.1.2
+Homepage: https://github.com/hgst/dm-zoned-tools
+
+Package: dm-zoned-tools
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Manage zoned block devices used with the dm-zoned device mapper 
+ The dmzadm utility formats backend devices used with the dm-zoned device
+ mapper. This utility will inspect the device verifying that the device is
+ a zoned block device and will prepare and write on-disk dm-zoned metadata
+ according to the device capacity, zone size, etc.
