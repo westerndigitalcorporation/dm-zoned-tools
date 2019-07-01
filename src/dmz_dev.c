@@ -326,10 +326,7 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 	}
 
 out:
-	if (rep)
-		free(rep);
-	if (ret != 0)
-		free(dev->zones);
+	free(rep);
 
 	return ret;
 }
@@ -495,11 +492,13 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
  */
 void dmz_close_dev(struct dmz_dev *dev)
 {
-	if (dev->fd >= 0)
+	if (dev->fd >= 0) {
 		close(dev->fd);
+		dev->fd = -1;
+	}
 
-	if (dev->zones)
-		free(dev->zones);
+	free(dev->zones);
+	dev->zones = NULL;
 }
 
 /*
