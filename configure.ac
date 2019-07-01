@@ -1,4 +1,4 @@
-AC_INIT([dm-zoned tools], [1.0.1], [damien.lemoal@wdc.com])
+AC_INIT([dm-zoned tools], [1.1.0], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)
 AC_CONFIG_HEADER([src/config.h])
