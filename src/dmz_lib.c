@@ -175,6 +175,8 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	 */
 	dev->zone_nr_bitmap_blocks =
 		dev->zone_nr_blocks >> (DMZ_BLOCK_SHIFT + 3);
+	if (!dev->zone_nr_bitmap_blocks)
+		dev->zone_nr_bitmap_blocks = 1;
 	dev->nr_bitmap_blocks = dev->nr_zones * dev->zone_nr_bitmap_blocks;
 	nr_bitmap_zones = (dev->nr_bitmap_blocks + dev->zone_nr_blocks - 1)
 		/ dev->zone_nr_blocks;
