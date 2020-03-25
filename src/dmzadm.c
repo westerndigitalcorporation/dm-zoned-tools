@@ -31,7 +31,8 @@ static void dmzadm_usage(void)
 	       "  --help | -h	: General help message\n"
 	       "  --format	: Format a block device metadata\n"
 	       "  --check	: Check a block device metadata\n"
-	       "  --repair	: Repair a block device metadata\n");
+	       "  --repair	: Repair a block device metadata\n"
+	       "  --start	: Start the device-mapper target\n");
 
 	printf("General options\n"
 	       "  --verbose	: Verbose output\n"
@@ -39,6 +40,7 @@ static void dmzadm_usage(void)
 
 	printf("Format operation options\n"
 	       "  --force	: Force overwrite of existing content\n"
+	       "  --label=<str> : Set the name to <str>\n"
 	       "  --seq=<num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
@@ -78,6 +80,8 @@ int main(int argc, char **argv)
 		op = DMZ_OP_CHECK;
 	} else if (strcmp(argv[1], "--repair") == 0) {
 		op = DMZ_OP_REPAIR;
+	} else if (strcmp(argv[1], "--start") == 0) {
+		op = DMZ_OP_START;
 	} else {
 		fprintf(stderr,
 			"Unknown operation \"%s\"\n",
@@ -196,6 +200,10 @@ int main(int argc, char **argv)
 
 	case DMZ_OP_REPAIR:
 		ret = dmz_repair(&dev);
+		break;
+
+	case DMZ_OP_START:
+		ret = dmz_start(&dev);
 		break;
 
 	default:
