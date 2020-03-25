@@ -39,7 +39,7 @@ static void dmzadm_usage(void)
 
 	printf("Format operation options\n"
 	       "  --force	: Force overwrite of existing content\n"
-	       "  --seq <num>	: Number of sequential zones reserved\n"
+	       "  --seq=<num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
 	       DMZ_NR_RESERVED_SEQ);
