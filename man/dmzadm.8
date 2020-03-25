@@ -53,6 +53,10 @@ Check the zoned block device metadata consistency and try to repair any error
 detected.
 
 .TP
+.B Start
+Load the metadata information from disk and activate the device-mapper target.
+
+.TP
 .B Help
 Print a short usage description of dmzadm
 
@@ -72,6 +76,10 @@ Check a zoned block device metadata.
 .TP
 .BR \-\-repair
 Check a zoned block device metadata and attempt to repair any error found.
+
+.TP
+.BR \-\-start
+Load zoned block device metadata and activate the device-mapper target.
 
 .TP
 .BR \-\-help ", " \-h
@@ -94,6 +102,12 @@ Very detailed output of actions taken.
 .TP
 .BR \-\-seq=<num>
 Specify the number of sequential zones to be reserved for reclaim.
+
+.TP
+.BR \-\-label=<str>
+Sets the name for the device-mapper device. Defaults to
+.I dmz-<devname>
+.
 
 .TP
 .SH AUTHOR
