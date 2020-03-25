@@ -151,6 +151,7 @@ enum dmz_op {
 	DMZ_OP_FORMAT = 1,
 	DMZ_OP_CHECK,
 	DMZ_OP_REPAIR,
+	DMZ_OP_START,
 };
 
 /*
@@ -163,6 +164,7 @@ struct dmz_dev {
 	char		*name;
 	int		op;
 	unsigned int	flags;
+	char		dmz_label[16];
 
 	/* Device info */
 	__u64		capacity;
@@ -330,5 +332,6 @@ extern int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
 extern int dmz_format(struct dmz_dev *dev);
 extern int dmz_check(struct dmz_dev *dev);
 extern int dmz_repair(struct dmz_dev *dev);
+extern int dmz_start(struct dmz_dev *dev);
 
 #endif /* __DMZ_H__ */
