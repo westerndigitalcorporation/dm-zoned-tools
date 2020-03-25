@@ -518,7 +518,11 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 
 	/* No valid block should be present after the write pointer */
 	bad_bits = 0;
-	wp_block = dmz_sect2blk(zone->wp - zone->start);
+	/* Check for full zones */
+	if (zone->wp == (__u64)-1)
+		wp_block = dev->zone_nr_blocks;
+	else
+		wp_block = dmz_sect2blk(zone->wp - zone->start);
 	for (b = 0; b < wp_block; b++) {
 		if (dmz_test_bit(dbuf, b))
 			dzone_weight++;
