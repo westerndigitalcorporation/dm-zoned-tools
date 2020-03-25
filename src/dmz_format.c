@@ -47,7 +47,7 @@ int dmz_write_super(struct dmz_dev *dev,
 	sb = (struct dm_zoned_super *) buf;
 
 	sb->magic = __cpu_to_le32(DMZ_MAGIC);
-	sb->version = __cpu_to_le32(DMZ_META_VER);
+	sb->version = __cpu_to_le32(dev->sb_version);
 
 	sb->gen = __cpu_to_le64(gen);
 
@@ -59,6 +59,11 @@ int dmz_write_super(struct dmz_dev *dev,
 	sb->nr_map_blocks = __cpu_to_le32(dev->nr_map_blocks);
 	sb->nr_bitmap_blocks = __cpu_to_le32(dev->nr_bitmap_blocks);
 
+	if (dev->sb_version == DMZ_META_VER) {
+		memcpy(sb->dmz_uuid, dev->dmz_uuid, 16);
+		memcpy(sb->dmz_label, dev->dmz_label, 32);
+		memcpy(sb->dev_uuid, dev->dev_uuid, 16);
+	}
 	crc = dmz_crc32(gen, sb, DMZ_BLOCK_SIZE);
 	sb->crc = __cpu_to_le32(crc);
 
@@ -185,15 +190,37 @@ static int dmz_write_meta(struct dmz_dev *dev,
  */
 int dmz_format(struct dmz_dev *dev)
 {
-
+	if (dev->sb_version == 0) {
+		fprintf(stderr, "Unsupported dm-zoned version %d\n",
+			dev->sb_version);
+		return -1;
+	}
+	if (dev->sb_version > DMZ_META_VER) {
+		dev->sb_version = DMZ_META_VER;
+		fprintf(stderr, "Falling back to dm-zoned version %d\n",
+			dev->sb_version);
+	}
 	/* calculate location of metadata blocks */
 	if (dmz_locate_metadata(dev) < 0)
 		return -1;
 
+	if (dev->sb_version == DMZ_META_VER) {
+		if (uuid_is_null(dev->dmz_uuid))
+			uuid_generate_random(dev->dmz_uuid);
+		if (uuid_is_null(dev->dev_uuid))
+			uuid_generate_random(dev->dev_uuid);
+	}
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_seq_data_zones;
 
-		printf("Format:\n");
+		printf("Format version %d:\n", dev->sb_version);
+		if (dev->sb_version == DMZ_META_VER) {
+			char dmz_uuid[UUID_STR_LEN];
+
+			uuid_unparse(dev->dmz_uuid, dmz_uuid);
+			printf("  DM-Zoned UUID %s\n", dmz_uuid);
+			printf("  DM-Zoned Label %s\n", dev->dmz_label);
+		}
 		printf("  %u useable zones\n",
 		       dev->nr_useable_zones);
 		printf("  Primary meta-data set: %u metadata blocks from block %llu (zone %u)\n",

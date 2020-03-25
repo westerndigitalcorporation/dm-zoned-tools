@@ -25,13 +25,15 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <linux/blkzoned.h>
+#include <uuid/uuid.h>
 
 /***** Type definitions *****/
 
 /*
  * Metadata version.
  */
-#define DMZ_META_VER	1
+#define DMZ_META_COMPAT_VER	1
+#define DMZ_META_VER	2
 
 /*
  * On-disk super block magic.
@@ -85,8 +87,18 @@ struct dm_zoned_super {
 	/* Checksum */
 	__le32		crc;			/*  48 */
 
+	/* Fields added by Metadata version 2 */
+	/* DM-Zoned label */
+	__u8		dmz_label[32];		/*  80 */
+
+	/* DM-Zoned UUID */
+	__u8		dmz_uuid[16];		/*  96 */
+
+	/* Device UUID */
+	__u8		dev_uuid[16];		/*  112 */
+
 	/* Padding to full 512B sector */
-	__u8		reserved[464];		/* 512 */
+	__u8		reserved[400];		/* 512 */
 
 } __attribute__ ((packed));
 
@@ -166,6 +178,8 @@ struct dmz_dev {
 	int		op;
 	unsigned int	flags;
 	char		dmz_label[16];
+	uuid_t		dmz_uuid;
+	uuid_t		dev_uuid;
 
 	/* Device info */
 	__u64		capacity;

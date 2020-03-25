@@ -730,7 +730,8 @@ static int dmz_check_meta(struct dmz_dev *dev,
 /*
  * Check the content of a super block
  */
-static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
+static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset,
+			bool primary)
 {
 	struct dm_zoned_super *sb = (struct dm_zoned_super *) mset->buf;
 	__u32 stored_crc, calculated_crc;
@@ -767,13 +768,40 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	}
 
 	/* Check version */
-	if (__le32_to_cpu(sb->version) != DMZ_META_VER) {
+	if (__le32_to_cpu(sb->version) > DMZ_META_VER) {
 		dmz_err(dev, 0,
 			"invalid version (expected 0x%x, read 0x%x)\n",
 			DMZ_META_VER, __le32_to_cpu(sb->version));
 		goto err;
 	}
 
+	/* Check UUID for V2 metadata */
+	if (__le32_to_cpu(sb->version) == DMZ_META_VER) {
+		if (primary) {
+			if (uuid_is_null(sb->dmz_uuid)) {
+				dmz_err(dev, 0,
+					"DM-Zoned UUID is null\n");
+				goto err;
+			}
+			uuid_copy(dev->dmz_uuid, sb->dmz_uuid);
+		} else if (uuid_compare(sb->dmz_uuid, dev->dmz_uuid)) {
+			char dev_uuid_buf[UUID_STR_LEN];
+			char sb_uuid_buf[UUID_STR_LEN];
+
+			uuid_unparse(dev->dmz_uuid, dev_uuid_buf);
+			uuid_unparse(sb->dmz_uuid, sb_uuid_buf);
+			dmz_err(dev, 0,
+				"DM-Zoned UUID mismatch (expected %s, read %s)\n",
+				dev_uuid_buf, sb_uuid_buf);
+			goto err;
+		}
+		memcpy(dev->dmz_label, sb->dmz_label, 32);
+		if (uuid_is_null(sb->dev_uuid)) {
+			dmz_err(dev, 0, "Device UUID is null\n");
+			goto err;
+		}
+		uuid_copy(dev->dev_uuid, sb->dev_uuid);
+	}
 	/* Check location */
 	if (__le64_to_cpu(sb->sb_block) != mset->sb_block) {
 		dmz_err(dev, 0,
@@ -843,7 +871,8 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	mset->map_block = mset->sb_block + 1;
 	mset->bitmap_block = mset->map_block + dev->nr_map_blocks;
 
-	dmz_msg(dev, 0, "OK (generation %llu)\n", mset->gen);
+	dmz_msg(dev, 0, "OK (version %d, generation %llu)\n",
+		__le32_to_cpu(sb->version), mset->gen);
 
 	return 0;
 
@@ -927,7 +956,7 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 	       dev->sb_block, dmz_zone_id(dev, dev->sb_zone));
 
 	mset[0].sb_block = dev->sb_block;
-	ret = dmz_check_sb(dev, &mset[0]);
+	ret = dmz_check_sb(dev, &mset[0], true);
 	if (ret != 0)
 		return -1;
 
@@ -970,7 +999,7 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 		"Secondary metadata set at block %llu (zone %u)\n",
 		mset[1].sb_block, dmz_block_zone_id(dev, mset[1].sb_block));
 
-	ret = dmz_check_sb(dev, &mset[1]);
+	ret = dmz_check_sb(dev, &mset[1], false);
 	if (ret != 0)
 		return -1;
 

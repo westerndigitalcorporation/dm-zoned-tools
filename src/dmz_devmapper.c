@@ -42,6 +42,16 @@ int dmz_create_dm(struct dmz_dev *dev)
 	if (!dm_task_add_target (dmt, 0, capacity, "zoned", dev->path))
 		goto out;
 
+	if (dev->sb_version == DMZ_META_VER &&
+	    !uuid_is_null(dev->dmz_uuid)) {
+		char prefixed_uuid[UUID_STR_LEN + 4];
+
+
+		sprintf(prefixed_uuid, "dmz-");
+		uuid_unparse(dev->dmz_uuid, prefixed_uuid + 4);
+		if (!dm_task_set_uuid(dmt, prefixed_uuid))
+			goto out;
+	}
 	dm_task_skip_lockfs(dmt);
 	dm_task_no_flush(dmt);
 	dm_task_no_open_count(dmt);
@@ -163,6 +173,24 @@ static int dmz_load_sb(struct dmz_dev *dev)
 		goto out;
 	}
 
+       /* Check UUID for V2 metadata */
+	if (__le32_to_cpu(sb->version) == DMZ_META_VER) {
+		if (uuid_is_null(sb->dmz_uuid)) {
+			fprintf(stderr, "%s: DM-Zoned UUID is null\n",
+				dev->name);
+			ret = -EINVAL;
+			goto out;
+		}
+		uuid_copy(dev->dmz_uuid, sb->dmz_uuid);
+		memcpy(dev->dmz_label, sb->dmz_label, 32);
+		if (uuid_is_null(sb->dev_uuid)) {
+			fprintf(stderr, "%s: Device UUID is null\n", dev->name);
+			ret = -EINVAL;
+			goto out;
+		}
+		uuid_copy(dev->dev_uuid, sb->dev_uuid);
+	}
+
 	/* OK */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("%s: loaded superblock (version %d, generation %llu)\n",
@@ -248,8 +276,15 @@ int dmz_start(struct dmz_dev *dev)
 	if (!strlen(dev->dmz_label))
 		sprintf(dev->dmz_label, "dmz-%s", dev->name);
 
-	printf("%s: starting %s\n",
-	       dev->name, dev->dmz_label);
+	if (!uuid_is_null(dev->dmz_uuid)) {
+		char dmz_uuid[UUID_STR_LEN];
+
+		uuid_unparse(dev->dmz_uuid, dmz_uuid);
+		printf("%s: starting %s uuid %s\n",
+		       dev->name, dev->dmz_label, dmz_uuid);
+	} else
+		printf("%s: starting %s\n",
+		       dev->name, dev->dmz_label);
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,

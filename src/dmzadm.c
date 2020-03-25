@@ -128,6 +128,27 @@ int main(int argc, char **argv)
 				return 1;
 			}
 
+		} else if (strncmp(argv[i], "--label=", 8) == 0) {
+			const char *label = argv[i] + 8;
+			unsigned int label_size = strlen(label);
+
+			if (op != DMZ_OP_FORMAT) {
+				fprintf(stderr,
+					"--label option is valid only with the "
+					"format operation\n");
+				return 1;
+			}
+			if (label[0] == '\'' || label[0] == '\"') {
+				label++;
+				label_size -= 2;
+			}
+			if (label_size > 31) {
+				fprintf(stderr,
+					"Label too long (max 16 characters)\n");
+				return 1;
+			}
+			memcpy(dev.dmz_label, label, label_size);
+
 		} else if (strcmp(argv[i], "--force") == 0) {
 
 			if (op != DMZ_OP_FORMAT) {
