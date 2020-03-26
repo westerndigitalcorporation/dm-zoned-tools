@@ -32,7 +32,8 @@ static void dmzadm_usage(void)
 	       "  --format	: Format a block device metadata\n"
 	       "  --check	: Check a block device metadata\n"
 	       "  --repair	: Repair a block device metadata\n"
-	       "  --start	: Start the device-mapper target\n");
+	       "  --start	: Start the device-mapper target\n"
+	       "  --stop	: Stop the device-mapper target\n");
 
 	printf("General options\n"
 	       "  --verbose	: Verbose output\n"
@@ -82,6 +83,8 @@ int main(int argc, char **argv)
 		op = DMZ_OP_REPAIR;
 	} else if (strcmp(argv[1], "--start") == 0) {
 		op = DMZ_OP_START;
+	} else if (strcmp(argv[1], "--stop") == 0) {
+		op = DMZ_OP_STOP;
 	} else {
 		fprintf(stderr,
 			"Unknown operation \"%s\"\n",
@@ -183,6 +186,19 @@ int main(int argc, char **argv)
 		dev.sb_version = ret;
 	} else
 		printf("Using metadata version %d\n", dev.sb_version);
+
+	if (op == DMZ_OP_STOP) {
+		char holder[PATH_MAX];
+
+		if (dmz_get_dev_holder(&dev, holder) < 0)
+			return 1;
+		if (!strlen(holder)) {
+			fprintf(stderr, "%s: no dm-zoned device found\n",
+				dev.name);
+			return 1;
+		}
+		return dmz_stop(&dev, holder);
+	}
 
 	/* Open the device */
 	if (dmz_open_dev(&dev, op) < 0)

@@ -152,6 +152,7 @@ enum dmz_op {
 	DMZ_OP_CHECK,
 	DMZ_OP_REPAIR,
 	DMZ_OP_START,
+	DMZ_OP_STOP,
 };
 
 /*
@@ -320,6 +321,7 @@ dmz_zone_cond_str(struct blk_zone *zone)
 
 extern int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op);
 extern void dmz_close_dev(struct dmz_dev *dev);
+extern int dmz_get_dev_holder(struct dmz_dev *dev, char *holder);
 extern int dmz_sync_dev(struct dmz_dev *dev);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
@@ -335,5 +337,6 @@ extern int dmz_check(struct dmz_dev *dev);
 extern int dmz_repair(struct dmz_dev *dev);
 extern int dmz_init_dm(int log_level);
 extern int dmz_start(struct dmz_dev *dev);
+extern int dmz_stop(struct dmz_dev *dev, char *dm_dev);
 
 #endif /* __DMZ_H__ */
