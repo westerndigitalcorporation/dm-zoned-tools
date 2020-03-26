@@ -33,6 +33,7 @@ int dmz_write_super(struct dmz_dev *dev,
 {
 	__u64 sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
+	struct dmz_block_dev *bdev = &dev->bdev[0];
 	__u32 crc;
 	__u8 *buf;
 	int ret;
@@ -66,7 +67,7 @@ int dmz_write_super(struct dmz_dev *dev,
 	if (ret < 0)
 		fprintf(stderr,
 			"%s: Write super block at block %llu failed\n",
-			dev->name,
+			bdev->name,
 			sb_block);
 
 	free(buf);
@@ -108,7 +109,7 @@ static int dmz_write_mapping(struct dmz_dev *dev,
 		if (ret < 0) {
 			fprintf(stderr,
 				"%s: Write mapping block %llu failed\n",
-				dev->name,
+				dev->label,
 				map_block + i);
 			break;
 		}
@@ -146,7 +147,7 @@ static int dmz_write_bitmap(struct dmz_dev *dev,
 		if (ret < 0) {
 			fprintf(stderr,
 				"%s: Write bitmap block %llu failed\n",
-				dev->name,
+				dev->label,
 				bitmap_block + i);
 			break;
 		}
@@ -193,7 +194,6 @@ int dmz_format(struct dmz_dev *dev)
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_seq_data_zones;
 
-		printf("Format:\n");
 		printf("  %u useable zones\n",
 		       dev->nr_useable_zones);
 		printf("  Primary meta-data set: %u metadata blocks from block %llu (zone %u)\n",
@@ -241,11 +241,12 @@ int dmz_format(struct dmz_dev *dev)
 
 	/* Write secondary metadata set */
 	printf("Writing secondary metadata set\n");
-	if (dmz_write_meta(dev, dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
+	if (dmz_write_meta(dev,
+			   dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
 		return -1;
 
 	/* Sync */
-	if (dmz_sync_dev(dev) < 0)
+	if (dmz_sync_dev(&dev->bdev[0]) < 0)
 		return -1;
 
 	printf("Done.\n");

@@ -135,14 +135,21 @@ struct dm_zoned_map {
 #define DMZ_NR_RESERVED_SEQ	16
 
 /*
+ * Device types.
+ */
+enum dmz_dev_type {
+	DMZ_TYPE_ZONED_HA = 1,
+	DMZ_TYPE_ZONED_HM,
+	DMZ_TYPE_REGULAR,
+};
+
+/*
  * Device flags.
  */
 #define DMZ_VERBOSE		0x00000001
 #define DMZ_VVERBOSE		0x00000002
 #define DMZ_REPAIR		0x00000004
-#define DMZ_ZONED_HA		0x00000010
-#define DMZ_ZONED_HM		0x00000020
-#define DMZ_OVERWRITE		0x00000040
+#define DMZ_OVERWRITE		0x00000008
 
 /*
  * Operations.
@@ -156,13 +163,32 @@ enum dmz_op {
 };
 
 /*
+ * Block device descriptor.
+ */
+struct dmz_block_dev {
+	char		*path;
+	char		*name;
+
+	enum dmz_dev_type type;
+
+	__u64		capacity;
+
+	__u64		block_offset;
+
+	size_t		zone_nr_sectors;
+	size_t		zone_nr_blocks;
+
+	/* Device file descriptor */
+	int		fd;
+};
+
+/*
  * Device descriptor.
  */
 struct dmz_dev {
 
-	/* Device file path and basename */
-	char		*path;
-	char		*name;
+	/* Device block devices */
+	struct dmz_block_dev bdev[1];
 	int		op;
 	unsigned int	flags;
 	char		label[32];
@@ -199,9 +225,6 @@ struct dmz_dev {
 	/* Mapping table */
 	unsigned int	nr_map_blocks;
 	__u64		map_block;
-
-	/* Device file descriptor */
-	int		fd;
 
 };
 
@@ -259,9 +282,9 @@ static inline void dmz_clear_bit(__u8 *bitmap,
 				 DMZ_MSET_MAP_VALID |	\
 				 DMZ_MSET_BITMAP_VALID)
 
-#define dmz_dev_is_ha(dev)	((dev)->flags & DMZ_ZONED_HA)
-#define dmz_dev_is_hm(dev)	((dev)->flags & DMZ_ZONED_HM)
-#define dmz_dev_is_zoned(dev)	(dmz_dev_is_ha(dev) || dmz_dev_is_hm(dev))
+#define dmz_bdev_is_ha(bdev)	((bdev)->type == DMZ_TYPE_ZONED_HA)
+#define dmz_bdev_is_hm(bdev)	((bdev)->type == DMZ_TYPE_ZONED_HM)
+#define dmz_bdev_is_zoned(bdev)	(dmz_bdev_is_ha(bdev) || dmz_bdev_is_hm(bdev))
 
 #define dmz_zone_type(z)	(z)->type
 #define dmz_zone_conv(z)	((z)->type == BLK_ZONE_TYPE_CONVENTIONAL)
@@ -319,10 +342,11 @@ dmz_zone_cond_str(struct blk_zone *zone)
 #define dmz_zone_need_reset(z)	(int)(z)->reset
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
-extern int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op);
-extern void dmz_close_dev(struct dmz_dev *dev);
-extern int dmz_get_dev_holder(struct dmz_dev *dev, char *holder);
-extern int dmz_sync_dev(struct dmz_dev *dev);
+extern int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
+extern void dmz_close_dev(struct dmz_block_dev *dev);
+extern int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
+extern int dmz_sync_dev(struct dmz_block_dev *dev);
+extern int dmz_get_dev_zones(struct dmz_dev *dev);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
 extern int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
