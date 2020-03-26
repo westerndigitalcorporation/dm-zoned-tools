@@ -1240,7 +1240,7 @@ int dmz_repair(struct dmz_dev *dev)
 	}
 
 	/* Sync device */
-	if (dmz_sync_dev(dev) < 0)
+	if (dmz_sync_dev(&dev->bdev[0]) < 0)
 		return -1;
 
 	return 0;

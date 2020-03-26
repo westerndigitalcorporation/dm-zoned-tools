@@ -88,13 +88,13 @@ int dmz_create_dm(struct dmz_dev *dev)
 	if (!dm_task_set_name (dmt, dev->label))
 		goto out;
 
-	sprintf(params, "%s", dev->path);
+	sprintf(params, "%s", dev->bdev[0].path);
 
 	if (!dm_task_add_target (dmt, 0, capacity, "zoned", params))
 		goto out;
 
 	if (dev->flags & DMZ_VERBOSE)
-		printf("%s: table 0 %llu zoned %s\n", dev->name,
+		printf("%s: table 0 %llu zoned %s\n", dev->label,
 		       capacity, params);
 
 	dm_task_skip_lockfs(dmt);
@@ -201,7 +201,7 @@ static int dmz_load_sb(struct dmz_dev *dev)
 	if (__le32_to_cpu(sb->magic) != DMZ_MAGIC) {
 		fprintf(stderr,
 			"%s: invalid magic (expected 0x%08x read 0x%08x)\n",
-			dev->name, DMZ_MAGIC, __le32_to_cpu(sb->magic));
+			dev->bdev[0].name, DMZ_MAGIC, __le32_to_cpu(sb->magic));
 		ret = -EINVAL;
 		goto out;
 	}
@@ -213,7 +213,7 @@ static int dmz_load_sb(struct dmz_dev *dev)
 	if (calculated_crc != stored_crc) {
 		fprintf(stderr,
 			"%s: invalid crc (expected 0x%08x, read 0x%08x)\n",
-			dev->name, calculated_crc, stored_crc);
+			dev->bdev[0].name, calculated_crc, stored_crc);
 		ret = -EINVAL;
 		goto out;
 	}
@@ -221,7 +221,7 @@ static int dmz_load_sb(struct dmz_dev *dev)
 	/* OK */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("%s: loaded superblock (version %d, generation %llu)\n",
-		       dev->name, __le32_to_cpu(sb->version),
+		       dev->bdev[0].name, __le32_to_cpu(sb->version),
 		       __le64_to_cpu(sb->gen));
 
 out:
@@ -231,6 +231,7 @@ out:
 
 int dmz_start(struct dmz_dev *dev)
 {
+
 	/* Calculate metadata location */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("Locating metadata...\n");
@@ -253,10 +254,10 @@ int dmz_start(struct dmz_dev *dev)
 
 	/* Generate dm name if not set */
 	if (!strlen(dev->label))
-		sprintf(dev->label, "dmz-%s", dev->name);
+		sprintf(dev->label, "dmz-%s", dev->bdev[0].name);
 
 	printf("%s: starting %s\n",
-	       dev->name, dev->label);
+	       dev->bdev[0].name, dev->label);
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,
@@ -282,18 +283,18 @@ int dmz_stop(struct dmz_dev *dev, char *dm_name)
 	if (ret < 0) {
 		fprintf(stderr,
 			"%s: dm device %s is not a zoned target device\n",
-			dev->name, dm_name);
+			dev->bdev[0].name, dm_name);
 		return ret;
 	}
 
 	printf("%s: stopping %s\n",
-	       dev->name, dev->label);
+	       dev->bdev[0].name, dev->label);
 
 	ret = dmz_deactivate_dm(dm_dev);
 	if (ret < 0) {
 		fprintf(stderr,
 			"%s: could not deactivate %s\n",
-			dev->name, dev->label);
+			dev->bdev[0].name, dev->label);
 		return ret;
 	}
 	return 0;

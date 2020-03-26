@@ -48,6 +48,7 @@ int dmz_reset_zone(struct dmz_dev *dev,
 		   struct blk_zone *zone)
 {
 	struct blk_zone_range range;
+	struct dmz_block_dev *bdev = &dev->bdev[0];
 
 	if (dmz_zone_conv(zone) ||
 	    dmz_zone_empty(zone))
@@ -56,10 +57,10 @@ int dmz_reset_zone(struct dmz_dev *dev,
 	/* Non empty sequential zone: reset */
 	range.sector = dmz_zone_sector(zone);
 	range.nr_sectors = dmz_zone_length(zone);
-	if (ioctl(dev->fd, BLKRESETZONE, &range) < 0) {
+	if (ioctl(bdev->fd, BLKRESETZONE, &range) < 0) {
 		fprintf(stderr,
 			"%s: Reset zone %u failed %d (%s)\n",
-			dev->name,
+			bdev->name,
 			dmz_zone_id(dev, zone),
 			errno, strerror(errno));
 		return -1;
@@ -108,21 +109,21 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 
 		if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
 			printf("%s: Ignoring read-only zone %u\n",
-			       dev->name,
+			       dev->label,
 			       dmz_zone_id(dev, zone));
 			continue;
 		}
 
 		if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
 			printf("%s: Ignoring offline zone %u\n",
-			       dev->name,
+			       dev->label,
 			       dmz_zone_id(dev, zone));
 			continue;
 		}
 
 		if (dmz_zone_length(zone) != dev->zone_nr_sectors) {
 			printf("%s: Ignoring runt zone %u\n",
-			       dev->name,
+			       dev->label,
 			       dmz_zone_id(dev, zone));
 			continue;
 		}
@@ -149,7 +150,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	if (dev->nr_rnd_zones < 3) {
 		fprintf(stderr,
 			"%s: Not enough random zones found\n",
-			dev->name);
+			dev->label);
 		return -1;
 	}
 
@@ -162,7 +163,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	if (dev->nr_reserved_seq >= dev->nr_useable_zones) {
 		fprintf(stderr,
 			"%s: Not enough useable zones found\n",
-			dev->name);
+			dev->label);
 		return -1;
 	}
 
@@ -182,7 +183,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	if ((nr_bitmap_zones + dev->nr_reserved_seq) > dev->nr_useable_zones) {
 		fprintf(stderr,
 			"%s: Not enough zones\n",
-			dev->name);
+			dev->label);
 		return -1;
 	}
 
@@ -210,7 +211,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 		fprintf(stderr,
 			"%s: Insufficient number of random zones "
 			"(need %u, have %u)\n",
-			dev->name,
+			dev->label,
 			dev->total_nr_meta_zones,
 			dev->nr_rnd_zones);
 		return -1;
