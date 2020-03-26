@@ -48,6 +48,16 @@ static void dmzadm_usage(void)
 	       DMZ_NR_RESERVED_SEQ);
 }
 
+void print_dev_info(struct dmz_block_dev *bdev)
+{
+	printf("%s: %llu 512-byte sectors (%llu GiB)\n",
+	       bdev->path, bdev->capacity,
+	       (bdev->capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
+	printf("  Host-%s device\n",
+	       (bdev->type == DMZ_TYPE_ZONED_HM) ? "managed" : "aware");
+
+}
+
 /*
  * Main function.
  */
@@ -55,12 +65,12 @@ int main(int argc, char **argv)
 {
 	unsigned int nr_zones;
 	struct dmz_dev dev;
-	int i, ret, log_level = 0;
+	int i, ret, log_level = 0, optnum;
 	enum dmz_op op;
 
 	/* Initialize */
 	memset(&dev, 0, sizeof(dev));
-	dev.fd = -1;
+	dev.bdev[0].fd = -1;
 	dev.nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
 	dev.sb_version = DMZ_META_VER;
 
@@ -98,10 +108,11 @@ int main(int argc, char **argv)
 	}
 
 	/* Get device path */
-	dev.path = argv[2];
+	dev.bdev[0].path = argv[2];
+	optnum = 3;
 
 	/* Parse arguments */
-	for (i = 3; i < argc; i++) {
+	for (i = optnum; i < argc; i++) {
 
 		if (strcmp(argv[i], "--verbose") == 0) {
 
@@ -181,35 +192,31 @@ int main(int argc, char **argv)
 	if (ret <= 0)
 		return 1;
 
-	if (ret < DMZ_META_VER) {
-		printf("Falling back to metadata version %d\n", ret);
-		dev.sb_version = ret;
-	} else
-		printf("Using metadata version %d\n", dev.sb_version);
-
 	if (op == DMZ_OP_STOP) {
 		char holder[PATH_MAX];
 
-		if (dmz_get_dev_holder(&dev, holder) < 0)
+		if (dmz_get_dev_holder(&dev.bdev[0], holder) < 0)
 			return 1;
 		if (!strlen(holder)) {
 			fprintf(stderr, "%s: no dm-zoned device found\n",
-				dev.name);
+				dev.bdev[0].name);
 			return 1;
 		}
 		return dmz_stop(&dev, holder);
 	}
 
 	/* Open the device */
-	if (dmz_open_dev(&dev, op) < 0)
+	if (dmz_open_dev(&dev.bdev[0], op, dev.flags) < 0)
 		return 1;
 
-	printf("%s: %llu 512-byte sectors (%llu GiB)\n",
-	       dev.path,
-	       dev.capacity,
-	       (dev.capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
-	printf("  Host-%s device\n",
-	       (dev.flags & DMZ_ZONED_HM) ? "managed" : "aware");
+	print_dev_info(&dev.bdev[0]);
+	dev.capacity = dev.bdev[0].capacity;
+	dev.zone_nr_sectors = dev.bdev[0].zone_nr_sectors;
+	dev.zone_nr_blocks = dev.bdev[0].zone_nr_blocks;
+
+	if (dmz_get_dev_zones(&dev) < 0)
+		return 1;
+
 	nr_zones = dev.capacity / dev.zone_nr_sectors;
 	printf("  %u zones of %zu 512-byte sectors (%zu MiB)\n",
 	       nr_zones,
@@ -251,7 +258,9 @@ int main(int argc, char **argv)
 
 	}
 
-	dmz_close_dev(&dev);
+	free(dev.zones);
+	dev.zones = NULL;
+	dmz_close_dev(&dev.bdev[0]);
 
 	return ret;
 }

@@ -36,7 +36,7 @@
 /*
  * Test if the device is mounted.
  */
-static int dmz_dev_mounted(struct dmz_dev *dev)
+static int dmz_dev_mounted(struct dmz_block_dev *dev)
 {
 	struct mntent *mnt = NULL;
 	FILE *file = NULL;
@@ -57,7 +57,7 @@ static int dmz_dev_mounted(struct dmz_dev *dev)
 /*
  * Test if the device is already used as a target backend.
  */
-static int dmz_dev_busy(struct dmz_dev *dev, char *holder)
+static int dmz_dev_busy(struct dmz_block_dev *dev, char *holder)
 {
 	char path[128];
 	struct dirent **namelist;
@@ -90,7 +90,7 @@ static int dmz_dev_busy(struct dmz_dev *dev, char *holder)
 /*
  * Get a zoned block device model (host-aware or howt-managed).
  */
-static int dmz_get_dev_model(struct dmz_dev *dev)
+static int dmz_get_dev_model(struct dmz_block_dev *dev)
 {
 	char str[PATH_MAX];
 	FILE *file;
@@ -114,7 +114,6 @@ static int dmz_get_dev_model(struct dmz_dev *dev)
 		fprintf(stderr, "Open %s failed\n", str);
 		return -1;
 	}
-
 	memset(str, 0, sizeof(str));
 	res = fscanf(file, "%s", str);
 	fclose(file);
@@ -125,9 +124,9 @@ static int dmz_get_dev_model(struct dmz_dev *dev)
 	}
 
 	if (strcmp(str, "host-aware") == 0)
-		dev->flags |= DMZ_ZONED_HA;
+		dev->type = DMZ_TYPE_ZONED_HA;
 	else if (strcmp(str, "host-managed") == 0)
-		dev->flags |= DMZ_ZONED_HM;
+		dev->type = DMZ_TYPE_ZONED_HM;
 
 	return 0;
 }
@@ -135,7 +134,7 @@ static int dmz_get_dev_model(struct dmz_dev *dev)
 /*
  * Get device capacity and zone size.
  */
-static int dmz_get_dev_capacity(struct dmz_dev *dev)
+static int dmz_get_dev_capacity(struct dmz_block_dev *dev)
 {
 	char str[128];
 	FILE *file;
@@ -233,8 +232,9 @@ static void dmz_print_zone(struct dmz_dev *dev,
 /*
  * Get a device zone configuration.
  */
-static int dmz_get_dev_zones(struct dmz_dev *dev)
+int dmz_get_dev_zones(struct dmz_dev *dev)
 {
+	struct dmz_block_dev *bdev = &dev->bdev[0];
 	struct blk_zone_report *rep = NULL;
 	unsigned int rep_max_zones;
 	struct blk_zone *blkz;
@@ -271,11 +271,11 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 		memset(rep, 0, DMZ_REPORT_ZONES_BUFSZ);
 		rep->sector = sector;
 		rep->nr_zones = rep_max_zones;
-		ret = ioctl(dev->fd, BLKREPORTZONE, rep);
+		ret = ioctl(bdev->fd, BLKREPORTZONE, rep);
 		if (ret != 0) {
 			fprintf(stderr,
 				"%s: Get zone information failed %d (%s)\n",
-				dev->name, errno, strerror(errno));
+				bdev->name, errno, strerror(errno));
 			goto out;
 		}
 
@@ -293,7 +293,7 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 			    dmz_zone_sector(blkz) + dmz_zone_length(blkz) != dev->capacity) {
 				fprintf(stderr,
 					"%s: Invalid zone %u size\n",
-					dev->name,
+					bdev->name,
 					dmz_zone_id(dev, blkz));
 				ret = -1;
 				goto out;
@@ -313,7 +313,7 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 		fprintf(stderr,
 			"%s: Invalid zones (last sector reported is %llu, "
 			"expected %llu)\n",
-			dev->name,
+			dev->label,
 			sector, dev->capacity);
 		ret = -1;
 		goto out;
@@ -322,7 +322,7 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 	if (dev->nr_zones != nr_zones) {
 		fprintf(stderr,
 			"%s: Invalid number of zones (expected %u, got %u)\n",
-			dev->name,
+			dev->label,
 			nr_zones, dev->nr_zones);
 		ret = -1;
 		goto out;
@@ -337,13 +337,12 @@ out:
 /*
  * Get a device information.
  */
-static int dmz_get_dev_info(struct dmz_dev *dev)
+static int dmz_get_dev_info(struct dmz_block_dev *dev)
 {
-
 	if (dmz_get_dev_model(dev) < 0)
 		return -1;
 
-	if (!dmz_dev_is_zoned(dev)) {
+	if (!dmz_bdev_is_zoned(dev)) {
 		fprintf(stderr,
 			"%s: Not a zoned block device\n",
 			dev->name);
@@ -351,9 +350,6 @@ static int dmz_get_dev_info(struct dmz_dev *dev)
 	}
 
 	if (dmz_get_dev_capacity(dev) < 0)
-		return -1;
-
-	if (dmz_get_dev_zones(dev) < 0)
 		return -1;
 
 	return 0;
@@ -364,7 +360,7 @@ static int dmz_get_dev_info(struct dmz_dev *dev)
  * Return -1 on error, 0 if something valid is detected on the disk
  * and 1 if the disk appears to be unused.
  */
-static int dmz_check_overwrite(struct dmz_dev *dev)
+static int dmz_check_overwrite(struct dmz_block_dev *dev)
 {
 	const char *type;
 	blkid_probe pr;
@@ -427,7 +423,7 @@ out:
 /*
  * Open a device.
  */
-int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
+int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags)
 {
 	struct stat st;
 	int ret;
@@ -450,7 +446,7 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 		return -1;
 	}
 
-	if (op == DMZ_OP_FORMAT && (!(dev->flags & DMZ_OVERWRITE))) {
+	if (op == DMZ_OP_FORMAT && (!(flags & DMZ_OVERWRITE))) {
 		/* Check for existing valid content */
 		ret = dmz_check_overwrite(dev);
 		if (ret <= 0)
@@ -493,7 +489,7 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 /*
  * Get the holder of a device
  */
-int dmz_get_dev_holder(struct dmz_dev *dev, char *holder)
+int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder)
 {
 	struct stat st;
 
@@ -530,15 +526,12 @@ int dmz_get_dev_holder(struct dmz_dev *dev, char *holder)
 /*
  * Close an open device.
  */
-void dmz_close_dev(struct dmz_dev *dev)
+void dmz_close_dev(struct dmz_block_dev *dev)
 {
 	if (dev->fd >= 0) {
 		close(dev->fd);
 		dev->fd = -1;
 	}
-
-	free(dev->zones);
-	dev->zones = NULL;
 }
 
 /*
@@ -546,15 +539,16 @@ void dmz_close_dev(struct dmz_dev *dev)
  */
 int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 {
+	struct dmz_block_dev *bdev = &dev->bdev[0];
 	ssize_t ret;
 
-	ret = pread(dev->fd, (char *)buf,
+	ret = pread(bdev->fd, (char *)buf,
 		    DMZ_BLOCK_SIZE, block << DMZ_BLOCK_SHIFT);
 
 	if (ret != DMZ_BLOCK_SIZE) {
 		fprintf(stderr,
 			"%s: Read block %llu failed %d (%s)\n",
-			dev->name,
+			bdev->name,
 			block,
 			errno, strerror(errno));
 		return -1;
@@ -568,14 +562,15 @@ int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
  */
 int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 {
+	struct dmz_block_dev *bdev = &dev->bdev[0];
 	ssize_t ret;
 
-	ret = pwrite(dev->fd, (char *)buf,
+	ret = pwrite(bdev->fd, (char *)buf,
 		     DMZ_BLOCK_SIZE, block << DMZ_BLOCK_SHIFT);
 	if (ret != DMZ_BLOCK_SIZE) {
 		fprintf(stderr,
 			"%s: Write block %llu failed %d (%s)\n",
-			dev->name,
+			bdev->name,
 			block,
 			errno, strerror(errno));
 		return -1;
@@ -587,7 +582,7 @@ int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 /*
  * Write a metadata block.
  */
-int dmz_sync_dev(struct dmz_dev *dev)
+int dmz_sync_dev(struct dmz_block_dev *dev)
 {
 
 	printf("Syncing disk\n");
