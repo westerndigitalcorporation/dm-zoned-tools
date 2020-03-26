@@ -30,15 +30,8 @@ int dmz_create_dm(struct dmz_dev *dev)
 	int ret = -EINVAL;
 	struct dm_task *dmt;
 	uint32_t cookie = 0;
-	int log_level = 0;
 	__u64 capacity = dev->nr_zones * dev->zone_nr_sectors;
 	__u16 udev_flags = DM_UDEV_DISABLE_LIBRARY_FALLBACK;
-
-	dm_log_with_errno_init(NULL);
-
-	if (dev->flags & DMZ_VVERBOSE)
-		log_level++;
-	dm_log_init_verbose(log_level);
 
 	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
 		return -ENOMEM;
@@ -108,15 +101,6 @@ static int dmz_load_sb(struct dmz_dev *dev)
 		goto out;
 	}
 
-	/* Check version */
-	if (__le32_to_cpu(sb->version) > DMZ_META_VER) {
-		fprintf(stderr,
-			"%s: invalid version (expected 0x%x, read 0x%x)\n",
-			dev->name, DMZ_META_VER, __le32_to_cpu(sb->version));
-		ret = -EINVAL;
-		goto out;
-	}
-
 	/* OK */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("%s: loaded superblock (version %d, generation %llu)\n",
@@ -125,6 +109,53 @@ static int dmz_load_sb(struct dmz_dev *dev)
 
 out:
 	free(sb);
+	return ret;
+}
+
+int dmz_init_dm(int log_level)
+{
+	struct dm_task *dmt;
+	struct dm_versions *tgt, *last_tgt;
+	int ret = -ENXIO;
+
+	dm_log_with_errno_init(NULL);
+
+	dm_log_init_verbose(log_level);
+
+	if (!(dmt = dm_task_create(DM_DEVICE_LIST_VERSIONS)))
+		return -ENOMEM;
+
+	dm_task_no_open_count(dmt);
+
+	if (!dm_task_run(dmt)) {
+		fprintf(stderr, "Failed to communicated with device-mapper\n");
+		return -ENODEV;
+	}
+
+	tgt = dm_task_get_versions(dmt);
+	do {
+		last_tgt = tgt;
+		if (!strncmp("zoned", tgt->name, 5)) {
+			if (log_level)
+				printf("Found dm-zoned version %d.%d.%d\n",
+				       tgt->version[0], tgt->version[1],
+				       tgt->version[2]);
+			ret = 0;
+			if (tgt->version[0] == 1) {
+				ret = tgt->version[1];
+				break;
+			}
+			fprintf(stderr,
+				"Unsupported dm-zoned version %d.%d.%d\n",
+				tgt->version[0], tgt->version[1],
+				tgt->version[2]);
+		}
+		tgt = (void *) tgt + tgt->next;
+	} while (last_tgt != tgt);
+
+	dm_task_destroy(dmt);
+	if (ret < 0)
+		fprintf(stderr, "dm-zoned target not supported\n");
 	return ret;
 }
 

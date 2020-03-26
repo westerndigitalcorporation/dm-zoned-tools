@@ -54,7 +54,7 @@ int main(int argc, char **argv)
 {
 	unsigned int nr_zones;
 	struct dmz_dev dev;
-	int i, ret;
+	int i, ret, log_level = 0;
 	enum dmz_op op;
 
 	/* Initialize */
@@ -102,10 +102,12 @@ int main(int argc, char **argv)
 		if (strcmp(argv[i], "--verbose") == 0) {
 
 			dev.flags |= DMZ_VERBOSE;
+			log_level = 1;
 
 		} else if (strcmp(argv[i], "--vverbose") == 0) {
 
 			dev.flags |= DMZ_VERBOSE | DMZ_VVERBOSE;
+			log_level = 2;
 
 		} else if (strncmp(argv[i], "--seq=", 6) == 0) {
 
@@ -148,6 +150,14 @@ int main(int argc, char **argv)
 		}
 
 	}
+
+	/* Check device-mapper target version */
+	ret = dmz_init_dm(log_level);
+	if (ret <= 0)
+		return 1;
+
+	dev.sb_version = ret;
+	printf("Using interface version %d\n", dev.sb_version);
 
 	/* Open the device */
 	if (dmz_open_dev(&dev, op) < 0)
