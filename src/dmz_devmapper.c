@@ -34,6 +34,13 @@ int dmz_create_dm(struct dmz_dev_set *set, int idx)
 	__u64 capacity = dev->nr_zones * dev->zone_nr_sectors;
 	__u16 udev_flags = DM_UDEV_DISABLE_LIBRARY_FALLBACK;
 
+	/*
+	 * dm-zoned interface version 3 allows for capacity
+	 * being different than the resulting device size.
+	 */
+	if (set->if_version > 2)
+		capacity = dev->nr_chunks * dev->zone_nr_sectors;
+
 	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
 		return -ENOMEM;
 
