@@ -139,7 +139,7 @@ struct dm_zoned_map {
  */
 #define DMZ_VERBOSE		0x00000001
 #define DMZ_VVERBOSE		0x00000002
-#define DMZ_REPAIR  		0x00000004
+#define DMZ_REPAIR		0x00000004
 #define DMZ_ZONED_HA		0x00000010
 #define DMZ_ZONED_HM		0x00000020
 #define DMZ_OVERWRITE		0x00000040
@@ -209,17 +209,17 @@ struct dmz_meta_set {
 	int		id;
 	unsigned int	flags;
 
-	__u64 		sb_block;
+	__u64		sb_block;
 	__u64		map_block;
 	__u64		bitmap_block;
 
-	__u8 		buf[DMZ_BLOCK_SIZE];
-	__u8 		*map_buf;
+	__u8		buf[DMZ_BLOCK_SIZE];
+	__u8		*map_buf;
 
-	__u64 		gen;
+	__u64		gen;
 
-	unsigned int 	nr_mapped_chunks;
-	unsigned int 	nr_buf_chunks;
+	unsigned int	nr_mapped_chunks;
+	unsigned int	nr_buf_chunks;
 
 	unsigned int	error_count;
 	unsigned int	total_error_count;
@@ -259,7 +259,7 @@ static inline void dmz_clear_bit(__u8 *bitmap,
 #define dmz_dev_is_hm(dev)	((dev)->flags & DMZ_ZONED_HM)
 #define dmz_dev_is_zoned(dev)	(dmz_dev_is_ha(dev) || dmz_dev_is_hm(dev))
 
-#define dmz_zone_type(z)        (z)->type
+#define dmz_zone_type(z)	(z)->type
 #define dmz_zone_conv(z)	((z)->type == BLK_ZONE_TYPE_CONVENTIONAL)
 #define dmz_zone_seq_req(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_REQ)
 #define dmz_zone_seq_pref(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_PREF)
