@@ -184,6 +184,7 @@ struct dmz_dev {
 	size_t		zone_nr_blocks;
 
 	/* First metadata zone */
+	unsigned int	sb_version;
 	struct blk_zone	*sb_zone;
 	__u64		sb_block;
 
@@ -330,5 +331,6 @@ extern int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
 extern int dmz_format(struct dmz_dev *dev);
 extern int dmz_check(struct dmz_dev *dev);
 extern int dmz_repair(struct dmz_dev *dev);
+extern int dmz_init_dm(int log_level);
 
 #endif /* __DMZ_H__ */

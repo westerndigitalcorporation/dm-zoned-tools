@@ -31,10 +31,15 @@ AC_CHECK_HEADER(blkid/blkid.h, [],
 		[AC_MSG_ERROR([Couldn't find blkid/blkid.h])])
 AC_CHECK_HEADER(linux/blkzoned.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/blkzoned.h])])
+AC_CHECK_HEADER(libdevmapper.h, [],
+		[AC_MSG_ERROR([Couldn't find libdevmapper.h])])
 
 # Checks for libraries.
 AC_SEARCH_LIBS([blkid_do_fullprobe], [blkid], [],
 	       [AC_MSG_ERROR([Couldn't find libblkid])])
+
+AC_SEARCH_LIBS([dm_task_run], [devmapper], [],
+		[AC_MSG_ERROR([Couldn't find libdevmapper])])
 
 AC_CONFIG_FILES([
 	Makefile
