@@ -491,6 +491,43 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 }
 
 /*
+ * Get the holder of a device
+ */
+int dmz_get_dev_holder(struct dmz_dev *dev, char *holder)
+{
+	struct stat st;
+
+	dev->name = basename(dev->path);
+
+	/* Check that this is a block device */
+	if (stat(dev->path, &st) < 0) {
+		fprintf(stderr,
+			"Get %s stat failed %d (%s)\n",
+			dev->path,
+			errno, strerror(errno));
+		return -1;
+	}
+
+	if (!S_ISBLK(st.st_mode)) {
+		fprintf(stderr,
+			"%s is not a block device\n",
+			dev->path);
+		return -1;
+	}
+
+	if (dmz_dev_mounted(dev)) {
+		fprintf(stderr,
+			"%s is mounted\n",
+			dev->path);
+		return -1;
+	}
+
+	if (!dmz_dev_busy(dev, holder))
+		memset(holder, 0, PATH_MAX);
+	return 0;
+}
+
+/*
  * Close an open device.
  */
 void dmz_close_dev(struct dmz_dev *dev)
