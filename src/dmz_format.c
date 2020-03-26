@@ -28,9 +28,10 @@
 /*
  * Fill and write a super block.
  */
-int dmz_write_super(struct dmz_dev *dev,
+int dmz_write_super(struct dmz_dev_set *set, int idx,
 		    __u64 gen, __u64 offset)
 {
+	struct dmz_dev *dev = &set->dev[idx];
 	__u64 sb_block = dev->sb_block + offset;
 	struct dm_zoned_super *sb;
 	__u32 crc;
@@ -60,8 +61,8 @@ int dmz_write_super(struct dmz_dev *dev,
 	sb->nr_bitmap_blocks = __cpu_to_le32(dev->nr_bitmap_blocks);
 
 	if (dev->sb_version == DMZ_META_VER) {
-		memcpy(sb->dmz_uuid, dev->dmz_uuid, 16);
-		memcpy(sb->dmz_label, dev->dmz_label, 32);
+		memcpy(sb->dmz_uuid, set->dmz_uuid, 16);
+		memcpy(sb->dmz_label, set->dmz_label, 32);
 		memcpy(sb->dev_uuid, dev->dev_uuid, 16);
 	}
 	crc = dmz_crc32(gen, sb, DMZ_BLOCK_SIZE);
@@ -165,9 +166,10 @@ static int dmz_write_bitmap(struct dmz_dev *dev,
 /*
  * Write formatted metadata blocks.
  */
-static int dmz_write_meta(struct dmz_dev *dev,
-			  __u64 offset)
+static int dmz_write_meta(struct dmz_dev_set *set,
+			  int idx, __u64 offset)
 {
+	struct dmz_dev *dev = &set->dev[0];
 
 	/* Write mapping table */
 	if (dmz_write_mapping(dev, offset) < 0)
@@ -179,7 +181,7 @@ static int dmz_write_meta(struct dmz_dev *dev,
 
 	/* Write super block */
 	printf("  Writing super block\n");
-	if (dmz_write_super(dev, 1, offset) < 0)
+	if (dmz_write_super(set, idx, 1, offset) < 0)
 		return -1;
 
 	return 0;
@@ -188,38 +190,41 @@ static int dmz_write_meta(struct dmz_dev *dev,
 /*
  * Format a device.
  */
-int dmz_format(struct dmz_dev *dev)
+int dmz_format(struct dmz_dev_set *set)
 {
-	if (dev->sb_version == 0) {
+	int idx = 0;
+	struct dmz_dev *dev = &set->dev[idx];
+
+	if (set->if_version == 0) {
 		fprintf(stderr, "Unsupported dm-zoned version %d\n",
-			dev->sb_version);
+			set->if_version);
 		return -1;
 	}
 	if (dev->sb_version > DMZ_META_VER) {
 		dev->sb_version = DMZ_META_VER;
-		fprintf(stderr, "Falling back to dm-zoned version %d\n",
+		fprintf(stderr, "Falling back to metadata version %d\n",
 			dev->sb_version);
 	}
 	/* calculate location of metadata blocks */
-	if (dmz_locate_metadata(dev) < 0)
+	if (dmz_locate_metadata(set, idx) < 0)
 		return -1;
 
 	if (dev->sb_version == DMZ_META_VER) {
-		if (uuid_is_null(dev->dmz_uuid))
-			uuid_generate_random(dev->dmz_uuid);
+		if (uuid_is_null(set->dmz_uuid))
+			uuid_generate_random(set->dmz_uuid);
 		if (uuid_is_null(dev->dev_uuid))
 			uuid_generate_random(dev->dev_uuid);
 	}
-	if (dev->flags & DMZ_VERBOSE) {
+	if (set->flags & DMZ_VERBOSE) {
 		unsigned int nr_seq_data_zones;
 
-		printf("Format version %d:\n", dev->sb_version);
+		printf("Format metadata %d:\n", dev->sb_version);
 		if (dev->sb_version == DMZ_META_VER) {
 			char dmz_uuid[UUID_STR_LEN];
 
-			uuid_unparse(dev->dmz_uuid, dmz_uuid);
+			uuid_unparse(set->dmz_uuid, dmz_uuid);
 			printf("  DM-Zoned UUID %s\n", dmz_uuid);
-			printf("  DM-Zoned Label %s\n", dev->dmz_label);
+			printf("  DM-Zoned Label %s\n", set->dmz_label);
 		}
 		printf("  %u useable zones\n",
 		       dev->nr_useable_zones);
@@ -263,12 +268,13 @@ int dmz_format(struct dmz_dev *dev)
 
 	/* Write primary metadata set */
 	printf("Writing primary metadata set\n");
-	if (dmz_write_meta(dev, 0) < 0)
+	if (dmz_write_meta(set, idx, 0) < 0)
 		return -1;
 
 	/* Write secondary metadata set */
 	printf("Writing secondary metadata set\n");
-	if (dmz_write_meta(dev, dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
+	if (dmz_write_meta(set, idx,
+			   dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
 		return -1;
 
 	/* Sync */

@@ -21,6 +21,32 @@
 #include <string.h>
 #include <errno.h>
 
+void dmz_dev_info(struct dmz_dev *dev)
+{
+	unsigned int nr_zones;
+
+	printf("%s: %llu 512-byte sectors (%llu GiB)\n",
+	       dev->path,
+	       dev->capacity,
+	       (dev->capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
+	printf("  Host-%s device\n",
+	       (dev->dev_type == DMZ_TYPE_ZONED_HM) ? "managed" : "aware");
+	nr_zones = dev->capacity / dev->zone_nr_sectors;
+	printf("  %u zones of %zu 512-byte sectors (%zu MiB)\n",
+	       nr_zones,
+	       dev->zone_nr_sectors,
+	       (dev->zone_nr_sectors << 9) / (1024 * 1024));
+	if (nr_zones < dev->nr_zones) {
+		size_t runt_sectors = dev->capacity & (dev->zone_nr_sectors - 1);
+
+		printf("  1 runt zone of %zu 512-byte sectors (%zu MiB)\n",
+		       runt_sectors,
+		       (runt_sectors << 9) / (1024 * 1024));
+	}
+	printf("  %zu 4KB data blocks per zone\n",
+	       dev->zone_nr_blocks);
+}
+
 /*
  * Print usage.
  */
@@ -53,15 +79,14 @@ static void dmzadm_usage(void)
  */
 int main(int argc, char **argv)
 {
-	unsigned int nr_zones;
-	struct dmz_dev dev;
-	int i, ret, log_level = 0;
+	struct dmz_dev_set set;
+	int i, ret, log_level = 0, optarg;
 	enum dmz_op op;
 
 	/* Initialize */
-	memset(&dev, 0, sizeof(dev));
-	dev.fd = -1;
-	dev.nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
+	memset(&set, 0, sizeof(set));
+	set.dev[0].fd = -1;
+	set.dev[0].nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
 
 	/* Parse operation */
 	if (argc < 2 ||
@@ -97,19 +122,21 @@ int main(int argc, char **argv)
 	}
 
 	/* Get device path */
-	dev.path = argv[2];
+	optarg = 2;
+	set.dev[0].path = argv[optarg];
+	optarg++;
 
 	/* Parse arguments */
-	for (i = 3; i < argc; i++) {
+	for (i = optarg; i < argc; i++) {
 
 		if (strcmp(argv[i], "--verbose") == 0) {
 
-			dev.flags |= DMZ_VERBOSE;
+			set.flags |= DMZ_VERBOSE;
 			log_level = 1;
 
 		} else if (strcmp(argv[i], "--vverbose") == 0) {
 
-			dev.flags |= DMZ_VERBOSE | DMZ_VVERBOSE;
+			set.flags |= DMZ_VERBOSE | DMZ_VVERBOSE;
 			log_level = 2;
 
 		} else if (strncmp(argv[i], "--seq=", 6) == 0) {
@@ -121,8 +148,8 @@ int main(int argc, char **argv)
 				return 1;
 			}
 
-			dev.nr_reserved_seq = atoi(argv[i] + 6);
-			if (dev.nr_reserved_seq <= 0) {
+			set.dev[0].nr_reserved_seq = atoi(argv[i] + 6);
+			if (set.dev[0].nr_reserved_seq <= 0) {
 				fprintf(stderr,
 					"Invalid number of sequential zones\n");
 				return 1;
@@ -147,7 +174,7 @@ int main(int argc, char **argv)
 					"Label too long (max 16 characters)\n");
 				return 1;
 			}
-			memcpy(dev.dmz_label, label, label_size);
+			memcpy(set.dmz_label, label, label_size);
 
 		} else if (strcmp(argv[i], "--force") == 0) {
 
@@ -158,7 +185,7 @@ int main(int argc, char **argv)
 				return 1;
 			}
 
-			dev.flags |= DMZ_OVERWRITE;
+			set.flags |= DMZ_OVERWRITE;
 
 		} else if (argv[i][0] != '-') {
 
@@ -180,63 +207,43 @@ int main(int argc, char **argv)
 	if (ret <= 0)
 		return 1;
 
-	dev.sb_version = ret;
-	printf("Using interface version %d\n", dev.sb_version);
+	set.if_version = ret;
+	printf("Using interface version %d\n", set.if_version);
 
 	if (op == DMZ_OP_STOP) {
 		char holder[PATH_MAX];
 
-		if (dmz_get_dev_holder(&dev, holder) < 0)
+		if (dmz_get_dev_holder(&set.dev[0], holder) < 0)
 			return 1;
 		if (!strlen(holder)) {
 			fprintf(stderr, "%s: no dm-zoned device found\n",
-				dev.name);
+				set.dev[0].name);
 			return 1;
 		}
-		return dmz_stop(&dev, holder);
+		return dmz_stop(&set, holder);
 	}
 
 	/* Open the device */
-	if (dmz_open_dev(&dev, op) < 0)
+	if (dmz_open_dev(&set.dev[0], op, set.flags) < 0)
 		return 1;
-
-	printf("%s: %llu 512-byte sectors (%llu GiB)\n",
-	       dev.path,
-	       dev.capacity,
-	       (dev.capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
-	printf("  Host-%s device\n",
-	       (dev.flags & DMZ_ZONED_HM) ? "managed" : "aware");
-	nr_zones = dev.capacity / dev.zone_nr_sectors;
-	printf("  %u zones of %zu 512-byte sectors (%zu MiB)\n",
-	       nr_zones,
-	       dev.zone_nr_sectors,
-	       (dev.zone_nr_sectors << 9) / (1024 * 1024));
-	if (nr_zones < dev.nr_zones) {
-		size_t runt_sectors = dev.capacity & (dev.zone_nr_sectors - 1);
-
-		printf("  1 runt zone of %zu 512-byte sectors (%zu MiB)\n",
-		       runt_sectors,
-		       (runt_sectors << 9) / (1024 * 1024));
-	}
-	printf("  %zu 4KB data blocks per zone\n",
-	       dev.zone_nr_blocks);
+	dmz_dev_info(&set.dev[0]);
 
 	switch (op) {
 
 	case DMZ_OP_FORMAT:
-		ret = dmz_format(&dev);
+		ret = dmz_format(&set);
 		break;
 
 	case DMZ_OP_CHECK:
-		ret = dmz_check(&dev);
+		ret = dmz_check(&set);
 		break;
 
 	case DMZ_OP_REPAIR:
-		ret = dmz_repair(&dev);
+		ret = dmz_repair(&set);
 		break;
 
 	case DMZ_OP_START:
-		ret = dmz_start(&dev);
+		ret = dmz_start(&set);
 		break;
 
 	default:
@@ -247,7 +254,7 @@ int main(int argc, char **argv)
 
 	}
 
-	dmz_close_dev(&dev);
+	dmz_close_dev(&set.dev[0]);
 
 	return ret;
 }

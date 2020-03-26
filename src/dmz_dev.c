@@ -92,7 +92,7 @@ static int dmz_dev_busy(struct dmz_dev *dev, char *holder)
  */
 static int dmz_get_dev_model(struct dmz_dev *dev)
 {
-	char str[PATH_MAX];
+	char str[PATH_MAX] = {};
 	FILE *file;
 	int res;
 	int len;
@@ -110,24 +110,20 @@ static int dmz_get_dev_model(struct dmz_dev *dev)
 	}
 
 	file = fopen(str, "r");
-	if (!file) {
-		fprintf(stderr, "Open %s failed\n", str);
-		return -1;
+	if (file) {
+		memset(str, 0, sizeof(str));
+		res = fscanf(file, "%s", str);
+		fclose(file);
+
+		if (res != 1) {
+			fprintf(stderr, "Invalid file %s format\n", str);
+			return -1;
+		}
 	}
-
-	memset(str, 0, sizeof(str));
-	res = fscanf(file, "%s", str);
-	fclose(file);
-
-	if (res != 1) {
-		fprintf(stderr, "Invalid file %s format\n", str);
-		return -1;
-	}
-
 	if (strcmp(str, "host-aware") == 0)
-		dev->flags |= DMZ_ZONED_HA;
+		dev->dev_type = DMZ_TYPE_ZONED_HA;
 	else if (strcmp(str, "host-managed") == 0)
-		dev->flags |= DMZ_ZONED_HM;
+		dev->dev_type = DMZ_TYPE_ZONED_HM;
 
 	return 0;
 }
@@ -233,7 +229,7 @@ static void dmz_print_zone(struct dmz_dev *dev,
 /*
  * Get a device zone configuration.
  */
-static int dmz_get_dev_zones(struct dmz_dev *dev)
+static int dmz_get_dev_zones(struct dmz_dev *dev, int verbose)
 {
 	struct blk_zone_report *rep = NULL;
 	unsigned int rep_max_zones;
@@ -285,7 +281,7 @@ static int dmz_get_dev_zones(struct dmz_dev *dev)
 		blkz = (struct blk_zone *)(rep + 1);
 		for (i = 0; i < rep->nr_zones && sector < dev->capacity; i++) {
 
-			if (dev->flags & DMZ_VVERBOSE)
+			if (verbose > 1)
 				dmz_print_zone(dev, blkz);
 
 			/* Check zone size */
@@ -337,10 +333,17 @@ out:
 /*
  * Get a device information.
  */
-static int dmz_get_dev_info(struct dmz_dev *dev)
+static int dmz_get_dev_info(struct dmz_dev *dev, unsigned int flags)
 {
+	int verbose = (flags & DMZ_VERBOSE);
+
+	if (flags & DMZ_VVERBOSE)
+		verbose = 2;
 
 	if (dmz_get_dev_model(dev) < 0)
+		return -1;
+
+	if (dmz_get_dev_capacity(dev) < 0)
 		return -1;
 
 	if (!dmz_dev_is_zoned(dev)) {
@@ -349,11 +352,7 @@ static int dmz_get_dev_info(struct dmz_dev *dev)
 			dev->name);
 		return -1;
 	}
-
-	if (dmz_get_dev_capacity(dev) < 0)
-		return -1;
-
-	if (dmz_get_dev_zones(dev) < 0)
+	if (dmz_get_dev_zones(dev, verbose) < 0)
 		return -1;
 
 	return 0;
@@ -427,7 +426,7 @@ out:
 /*
  * Open a device.
  */
-int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
+int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op, int flags)
 {
 	struct stat st;
 	int ret;
@@ -450,7 +449,7 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 		return -1;
 	}
 
-	if (op == DMZ_OP_FORMAT && (!(dev->flags & DMZ_OVERWRITE))) {
+	if (op == DMZ_OP_FORMAT && (!(flags & DMZ_OVERWRITE))) {
 		/* Check for existing valid content */
 		ret = dmz_check_overwrite(dev);
 		if (ret <= 0)
@@ -482,7 +481,7 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 	}
 
 	/* Get device capacity and zone configuration */
-	if (dmz_get_dev_info(dev) < 0) {
+	if (dmz_get_dev_info(dev, flags) < 0) {
 		dmz_close_dev(dev);
 		return -1;
 	}

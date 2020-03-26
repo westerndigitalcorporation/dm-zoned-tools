@@ -25,8 +25,9 @@
 
 #include <libdevmapper.h>
 
-int dmz_create_dm(struct dmz_dev *dev)
+int dmz_create_dm(struct dmz_dev_set *set, int idx)
 {
+	struct dmz_dev *dev = &set->dev[idx];
 	int ret = -EINVAL;
 	struct dm_task *dmt;
 	uint32_t cookie = 0;
@@ -36,19 +37,19 @@ int dmz_create_dm(struct dmz_dev *dev)
 	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
 		return -ENOMEM;
 
-	if (!dm_task_set_name (dmt, dev->dmz_label))
+	if (!dm_task_set_name (dmt, set->dmz_label))
 		goto out;
 
 	if (!dm_task_add_target (dmt, 0, capacity, "zoned", dev->path))
 		goto out;
 
 	if (dev->sb_version == DMZ_META_VER &&
-	    !uuid_is_null(dev->dmz_uuid)) {
+	    !uuid_is_null(set->dmz_uuid)) {
 		char prefixed_uuid[UUID_STR_LEN + 4];
 
 
 		sprintf(prefixed_uuid, "dmz-");
-		uuid_unparse(dev->dmz_uuid, prefixed_uuid + 4);
+		uuid_unparse(set->dmz_uuid, prefixed_uuid + 4);
 		if (!dm_task_set_uuid(dmt, prefixed_uuid))
 			goto out;
 	}
@@ -69,7 +70,7 @@ out:
 	return ret;
 }
 
-int dmz_check_dm_target(struct dmz_dev *dev, char *dm_dev)
+int dmz_check_dm_target(struct dmz_dev_set *set, char *dm_dev)
 {
 	int ret = -EINVAL;
 	struct dm_task *dmt;
@@ -94,7 +95,7 @@ int dmz_check_dm_target(struct dmz_dev *dev, char *dm_dev)
 			   &target_type, &params);
 	if (strlen(target_type) == 5 &&
 	    !strncmp(target_type, "zoned", 5)) {
-		strcpy(dev->dmz_label, dm_task_get_name(dmt));
+		strcpy(set->dmz_label, dm_task_get_name(dmt));
 		ret = 0;
 	}
 out:
@@ -134,8 +135,9 @@ out:
 /*
  * Load the contents of a super block
  */
-static int dmz_load_sb(struct dmz_dev *dev)
+static int dmz_load_sb(struct dmz_dev_set *set, int idx)
 {
+	struct dmz_dev *dev = &set->dev[idx];
 	struct dm_zoned_super *sb;
 	unsigned char *buf;
 	__u32 stored_crc, calculated_crc;
@@ -181,8 +183,8 @@ static int dmz_load_sb(struct dmz_dev *dev)
 			ret = -EINVAL;
 			goto out;
 		}
-		uuid_copy(dev->dmz_uuid, sb->dmz_uuid);
-		memcpy(dev->dmz_label, sb->dmz_label, 32);
+		uuid_copy(set->dmz_uuid, sb->dmz_uuid);
+		memcpy(set->dmz_label, sb->dmz_label, 32);
 		if (uuid_is_null(sb->dev_uuid)) {
 			fprintf(stderr, "%s: Device UUID is null\n", dev->name);
 			ret = -EINVAL;
@@ -192,7 +194,7 @@ static int dmz_load_sb(struct dmz_dev *dev)
 	}
 
 	/* OK */
-	if (dev->flags & DMZ_VERBOSE)
+	if (set->flags & DMZ_VERBOSE)
 		printf("%s: loaded superblock (version %d, generation %llu)\n",
 		       dev->name, __le32_to_cpu(sb->version),
 		       __le64_to_cpu(sb->gen));
@@ -249,64 +251,68 @@ int dmz_init_dm(int log_level)
 	return ret;
 }
 
-int dmz_start(struct dmz_dev *dev)
+int dmz_start(struct dmz_dev_set *set)
 {
+	int idx = 0;
+	struct dmz_dev *dev = &set->dev[idx];
+
 	/* Calculate metadata location */
-	if (dev->flags & DMZ_VERBOSE)
+	if (set->flags & DMZ_VERBOSE)
 		printf("%s: Locating metadata...\n", dev->name);
-	if (dmz_locate_metadata(dev) < 0) {
+	if (dmz_locate_metadata(set, idx) < 0) {
 		fprintf(stderr,
 			"%s: Failed to locate metadata\n", dev->name);
 		return -1;
 	}
 
 	/* Check primary super block */
-	if (dev->flags & DMZ_VERBOSE)
+	if (set->flags & DMZ_VERBOSE)
 		printf("%s: Primary metadata set at block %llu (zone %u)\n",
 		       dev->name, dev->sb_block,
 		       dmz_zone_id(dev, dev->sb_zone));
 
-	if (dmz_load_sb(dev) < 0) {
+	if (dmz_load_sb(set, idx) < 0) {
 		fprintf(stderr,
 			"%s: Failed to load metadata\n", dev->name);
 		return -1;
 	}
 
 	/* Generate dm name if not set */
-	if (!strlen(dev->dmz_label))
-		sprintf(dev->dmz_label, "dmz-%s", dev->name);
+	if (!strlen(set->dmz_label))
+		sprintf(set->dmz_label, "dmz-%s", dev->name);
 
-	if (!uuid_is_null(dev->dmz_uuid)) {
+	if (!uuid_is_null(set->dmz_uuid)) {
 		char dmz_uuid[UUID_STR_LEN];
 
-		uuid_unparse(dev->dmz_uuid, dmz_uuid);
+		uuid_unparse(set->dmz_uuid, dmz_uuid);
 		printf("%s: starting %s uuid %s\n",
-		       dev->name, dev->dmz_label, dmz_uuid);
+		       dev->name, set->dmz_label, dmz_uuid);
 	} else
 		printf("%s: starting %s\n",
-		       dev->name, dev->dmz_label);
+		       dev->name, set->dmz_label);
 
-	if (dmz_create_dm(dev)) {
+	if (dmz_create_dm(set, idx)) {
 		fprintf(stderr,
-			"%s: Failed to start %s", dev->name, dev->dmz_label);
+			"%s: Failed to start %s", dev->name, set->dmz_label);
 		return -1;
 	}
 	return 0;
 }
 
-int dmz_stop(struct dmz_dev *dev, char *dm_name)
+int dmz_stop(struct dmz_dev_set *set, char *dm_name)
 {
+	struct dmz_dev *dev = &set->dev[0];
 	int ret, log_level = 0;
 	char dm_dev[PATH_MAX];
 
 	dm_log_with_errno_init(NULL);
 
-	if (dev->flags & DMZ_VVERBOSE)
+	if (set->flags & DMZ_VVERBOSE)
 		log_level++;
 	dm_log_init_verbose(log_level);
 
 	sprintf(dm_dev, "/dev/%s", dm_name);
-	ret = dmz_check_dm_target(dev, dm_dev);
+	ret = dmz_check_dm_target(set, dm_dev);
 	if (ret < 0) {
 		fprintf(stderr,
 			"%s: dm device %s is not a zoned target device\n",
@@ -315,13 +321,13 @@ int dmz_stop(struct dmz_dev *dev, char *dm_name)
 	}
 
 	printf("%s: stopping %s\n",
-	       dev->name, dev->dmz_label);
+	       dev->name, set->dmz_label);
 
 	ret = dmz_deactivate_dm(dm_dev);
 	if (ret < 0) {
 		fprintf(stderr,
 			"%s: could not deactivate %s\n",
-			dev->name, dev->dmz_label);
+			dev->name, set->dmz_label);
 		return ret;
 	}
 	return 0;

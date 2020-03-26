@@ -88,8 +88,9 @@ int dmz_reset_zones(struct dmz_dev *dev)
 /*
  * Determine location and amount of metadata blocks.
  */
-int dmz_locate_metadata(struct dmz_dev *dev)
+int dmz_locate_metadata(struct dmz_dev_set *set, int idx)
 {
+	struct dmz_dev *dev = &set->dev[idx];
 	struct blk_zone *zone;
 	unsigned int i = 0;
 	unsigned int nr_meta_blocks, nr_map_blocks;
