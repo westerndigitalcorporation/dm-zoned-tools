@@ -59,6 +59,68 @@ out:
 	return ret;
 }
 
+int dmz_check_dm_target(struct dmz_dev *dev, char *dm_dev)
+{
+	int ret = -EINVAL;
+	struct dm_task *dmt;
+	uint64_t start, length;
+	char *target_type, *params;
+
+	if (!(dmt = dm_task_create (DM_DEVICE_TABLE)))
+		return -ENOMEM;
+
+	if (!dm_task_set_name (dmt, dm_dev)) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	dm_task_no_open_count(dmt);
+
+	if (!dm_task_run (dmt)) {
+		ret = -EINVAL;
+		goto out;
+	}
+	dm_get_next_target(dmt, NULL, &start, &length,
+			   &target_type, &params);
+	if (strlen(target_type) == 5 &&
+	    !strncmp(target_type, "zoned", 5)) {
+		strcpy(dev->dmz_label, dm_task_get_name(dmt));
+		ret = 0;
+	}
+out:
+	dm_task_destroy(dmt);
+
+	return ret;
+}
+
+int dmz_deactivate_dm(char *dm_dev)
+{
+	int ret = -EINVAL;
+	struct dm_task *dmt;
+	uint32_t cookie = 0;
+	__u16 udev_flags = DM_UDEV_DISABLE_LIBRARY_FALLBACK;
+
+	if (!(dmt = dm_task_create (DM_DEVICE_REMOVE)))
+		return -ENOMEM;
+
+	if (!dm_task_set_name (dmt, dm_dev)) {
+		goto out;
+	}
+
+	dm_task_no_open_count(dmt);
+
+	if (dm_task_set_cookie(dmt, &cookie, udev_flags)) {
+		if (dm_task_run (dmt)) {
+			dm_udev_wait(cookie);
+			ret = 0;
+		}
+	}
+out:
+	dm_task_destroy(dmt);
+
+	return ret;
+}
+
 /*
  * Load the contents of a super block
  */
@@ -193,6 +255,39 @@ int dmz_start(struct dmz_dev *dev)
 		fprintf(stderr,
 			"%s: Failed to start %s", dev->name, dev->dmz_label);
 		return -1;
+	}
+	return 0;
+}
+
+int dmz_stop(struct dmz_dev *dev, char *dm_name)
+{
+	int ret, log_level = 0;
+	char dm_dev[PATH_MAX];
+
+	dm_log_with_errno_init(NULL);
+
+	if (dev->flags & DMZ_VVERBOSE)
+		log_level++;
+	dm_log_init_verbose(log_level);
+
+	sprintf(dm_dev, "/dev/%s", dm_name);
+	ret = dmz_check_dm_target(dev, dm_dev);
+	if (ret < 0) {
+		fprintf(stderr,
+			"%s: dm device %s is not a zoned target device\n",
+			dev->name, dm_name);
+		return ret;
+	}
+
+	printf("%s: stopping %s\n",
+	       dev->name, dev->dmz_label);
+
+	ret = dmz_deactivate_dm(dm_dev);
+	if (ret < 0) {
+		fprintf(stderr,
+			"%s: could not deactivate %s\n",
+			dev->name, dev->dmz_label);
+		return ret;
 	}
 	return 0;
 }

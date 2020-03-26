@@ -57,7 +57,7 @@ static int dmz_dev_mounted(struct dmz_dev *dev)
 /*
  * Test if the device is already used as a target backend.
  */
-static int dmz_dev_busy(struct dmz_dev *dev)
+static int dmz_dev_busy(struct dmz_dev *dev, char *holder)
 {
 	char path[128];
 	struct dirent **namelist;
@@ -75,8 +75,11 @@ static int dmz_dev_busy(struct dmz_dev *dev)
 
 	while (n--) {
 		if (strcmp(namelist[n]->d_name, "..") != 0 &&
-		    strcmp(namelist[n]->d_name, ".") != 0)
+		    strcmp(namelist[n]->d_name, ".") != 0) {
+			if (holder)
+				strncpy(holder, namelist[n]->d_name, PATH_MAX);
 			ret = 1;
+		}
 		free(namelist[n]);
 	}
 	free(namelist);
@@ -461,7 +464,7 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 		return -1;
 	}
 
-	if (dmz_dev_busy(dev)) {
+	if (dmz_dev_busy(dev, NULL)) {
 		fprintf(stderr,
 			"%s is in use\n",
 			dev->path);
@@ -484,6 +487,43 @@ int dmz_open_dev(struct dmz_dev *dev, enum dmz_op op)
 		return -1;
 	}
 
+	return 0;
+}
+
+/*
+ * Get the holder of a device
+ */
+int dmz_get_dev_holder(struct dmz_dev *dev, char *holder)
+{
+	struct stat st;
+
+	dev->name = basename(dev->path);
+
+	/* Check that this is a block device */
+	if (stat(dev->path, &st) < 0) {
+		fprintf(stderr,
+			"Get %s stat failed %d (%s)\n",
+			dev->path,
+			errno, strerror(errno));
+		return -1;
+	}
+
+	if (!S_ISBLK(st.st_mode)) {
+		fprintf(stderr,
+			"%s is not a block device\n",
+			dev->path);
+		return -1;
+	}
+
+	if (dmz_dev_mounted(dev)) {
+		fprintf(stderr,
+			"%s is mounted\n",
+			dev->path);
+		return -1;
+	}
+
+	if (!dmz_dev_busy(dev, holder))
+		memset(holder, 0, PATH_MAX);
 	return 0;
 }
 
