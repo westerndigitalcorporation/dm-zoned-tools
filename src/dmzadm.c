@@ -52,13 +52,14 @@ int main(int argc, char **argv)
 {
 	unsigned int nr_zones;
 	struct dmz_dev dev;
-	int i, ret;
+	int i, ret, log_level = 0;
 	enum dmz_op op;
 
 	/* Initialize */
 	memset(&dev, 0, sizeof(dev));
 	dev.fd = -1;
 	dev.nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
+	dev.sb_version = DMZ_META_VER;
 
 	/* Parse operation */
 	if (argc < 2 ||
@@ -98,10 +99,12 @@ int main(int argc, char **argv)
 		if (strcmp(argv[i], "--verbose") == 0) {
 
 			dev.flags |= DMZ_VERBOSE;
+			log_level = 1;
 
 		} else if (strcmp(argv[i], "--vverbose") == 0) {
 
 			dev.flags |= DMZ_VERBOSE | DMZ_VVERBOSE;
+			log_level = 2;
 
 		} else if (strncmp(argv[i], "--seq=", 6) == 0) {
 
@@ -144,6 +147,17 @@ int main(int argc, char **argv)
 		}
 
 	}
+
+	/* Check device-mapper target version */
+	ret = dmz_init_dm(log_level);
+	if (ret <= 0)
+		return 1;
+
+	if (ret < DMZ_META_VER) {
+		printf("Falling back to metadata version %d\n", ret);
+		dev.sb_version = ret;
+	} else
+		printf("Using metadata version %d\n", dev.sb_version);
 
 	/* Open the device */
 	if (dmz_open_dev(&dev, op) < 0)

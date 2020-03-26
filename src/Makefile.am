@@ -7,6 +7,7 @@ CFILES = dmz_dev.c \
 	 dmz_lib.c \
 	 dmz_format.c \
 	 dmz_check.c \
+	 dmz_devmapper.c \
 	 dmzadm.c
 HFILES = dmz.h
 
