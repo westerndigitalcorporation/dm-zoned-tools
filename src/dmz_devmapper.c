@@ -82,13 +82,22 @@ int dmz_create_dm(struct dmz_dev *dev)
 	__u16 udev_flags = DM_UDEV_DISABLE_LIBRARY_FALLBACK;
 	char params[4096];
 
+	/*
+	 * dm-zoned interface version 3 allows for capacity
+	 * being different than the resulting device size.
+	 */
+	capacity = dev->nr_chunks * dev->zone_nr_sectors;
+
 	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
 		return -ENOMEM;
 
 	if (!dm_task_set_name (dmt, dev->label))
 		goto out;
 
-	sprintf(params, "%s", dev->bdev[0].path);
+	if (dev->sb_version > 1 && dev->bdev[1].path)
+		sprintf(params, "%s %s", dev->bdev[0].path, dev->bdev[1].path);
+	else
+		sprintf(params, "%s", dev->bdev[0].path);
 
 	if (!dm_task_add_target (dmt, 0, capacity, "zoned", params))
 		goto out;
@@ -97,6 +106,14 @@ int dmz_create_dm(struct dmz_dev *dev)
 		printf("%s: table 0 %llu zoned %s\n", dev->label,
 		       capacity, params);
 
+	if (dev->sb_version > 1) {
+		char prefixed_uuid[UUID_STR_LEN + 4];
+
+		sprintf(prefixed_uuid, "dmz-");
+		uuid_unparse(dev->uuid, prefixed_uuid + 4);
+		if (!dm_task_set_uuid(dmt, prefixed_uuid))
+			goto out;
+	}
 	dm_task_skip_lockfs(dmt);
 	dm_task_no_flush(dmt);
 	dm_task_no_open_count(dmt);
@@ -218,6 +235,18 @@ static int dmz_load_sb(struct dmz_dev *dev)
 		goto out;
 	}
 
+       /* Check UUID for V2 metadata */
+	if (__le32_to_cpu(sb->version) > 1) {
+		if (uuid_is_null(sb->dmz_uuid)) {
+			fprintf(stderr, "%s: DM-Zoned UUID is null\n",
+				dev->bdev[0].name);
+			ret = -EINVAL;
+			goto out;
+		}
+		uuid_copy(dev->uuid, sb->dmz_uuid);
+		strncpy(dev->label, (const char *)sb->dmz_label, 32);
+	}
+
 	/* OK */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("%s: loaded superblock (version %d, generation %llu)\n",
@@ -231,7 +260,6 @@ out:
 
 int dmz_start(struct dmz_dev *dev)
 {
-
 	/* Calculate metadata location */
 	if (dev->flags & DMZ_VERBOSE)
 		printf("Locating metadata...\n");
@@ -256,8 +284,15 @@ int dmz_start(struct dmz_dev *dev)
 	if (!strlen(dev->label))
 		sprintf(dev->label, "dmz-%s", dev->bdev[0].name);
 
-	printf("%s: starting %s\n",
-	       dev->bdev[0].name, dev->label);
+	if (dev->sb_version > 1) {
+		char dmz_uuid[UUID_STR_LEN];
+
+		uuid_unparse(dev->uuid, dmz_uuid);
+		printf("%s: starting %s uuid %s\n",
+		       dev->bdev[0].name, dev->label, dmz_uuid);
+	} else
+		printf("%s: starting %s\n",
+		       dev->bdev[0].name, dev->label);
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,

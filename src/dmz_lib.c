@@ -30,15 +30,15 @@
 __u32 dmz_crc32(__u32 crc, const void *buf, size_t length)
 {
         unsigned char *p = (unsigned char *)buf;
-        int i;
+	int i;
 
-        while (length--) {
-                crc ^= *p++;
-                for (i = 0; i < 8; i++)
-                        crc = (crc >> 1) ^ ((crc & 1) ? CRCPOLY_LE : 0);
-        }
+	while (length--) {
+		crc ^= *p++;
+		for (i = 0; i < 8; i++)
+			crc = (crc >> 1) ^ ((crc & 1) ? CRCPOLY_LE : 0);
+	}
 
-        return crc;
+	return crc;
 }
 
 /*
@@ -55,7 +55,8 @@ int dmz_reset_zone(struct dmz_dev *dev,
 		return 0;
 
 	/* Non empty sequential zone: reset */
-	range.sector = dmz_zone_sector(zone);
+	range.sector = dmz_zone_sector(zone) -
+		dmz_blk2sect(dev->bdev[0].block_offset);
 	range.nr_sectors = dmz_zone_length(zone);
 	if (ioctl(bdev->fd, BLKRESETZONE, &range) < 0) {
 		fprintf(stderr,
@@ -107,28 +108,6 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 
 		zone = &dev->zones[i];
 
-		if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
-			printf("%s: Ignoring read-only zone %u\n",
-			       dev->label,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-
-		if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
-			printf("%s: Ignoring offline zone %u\n",
-			       dev->label,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-
-		if (dmz_zone_length(zone) != dev->zone_nr_sectors) {
-			printf("%s: Ignoring runt zone %u\n",
-			       dev->label,
-			       dmz_zone_id(dev, zone));
-			continue;
-		}
-		dev->nr_useable_zones++;
-
 		if (dmz_zone_rnd(zone)) {
 			if (dev->sb_zone == NULL) {
 				dev->sb_zone = zone;
@@ -139,8 +118,20 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 				dev->max_nr_meta_zones++;
 			}
 			dev->nr_rnd_zones++;
-		}
+		} else {
+			if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
+				printf("  Ignoring read-only zone %u\n",
+				       dmz_zone_id(dev, zone));
+				continue;
+			}
 
+			if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
+				printf("  Ignoring offline zone %u\n",
+				       dmz_zone_id(dev, zone));
+				continue;
+			}
+		}
+		dev->nr_useable_zones++;
 	}
 
 	/*

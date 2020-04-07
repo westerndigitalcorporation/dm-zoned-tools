@@ -763,13 +763,71 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	}
 
 	/* Check version */
-	if (__le32_to_cpu(sb->version) != DMZ_META_VER) {
+	if (__le32_to_cpu(sb->version) > DMZ_META_VER) {
 		dmz_err(dev, 0,
 			"invalid version (expected 0x%x, read 0x%x)\n",
 			DMZ_META_VER, __le32_to_cpu(sb->version));
 		goto err;
 	}
 
+	/* Check UUID for V2 metadata */
+	if (__le32_to_cpu(sb->version) > 1) {
+		struct dmz_block_dev *bdev;
+
+		if (uuid_is_null(sb->dmz_uuid)) {
+			dmz_err(dev, 0,
+				"DM-Zoned UUID is null\n");
+			goto err;
+		} else if (uuid_is_null(dev->uuid)) {
+			uuid_copy(dev->uuid, sb->dmz_uuid);
+		} else if (uuid_compare(sb->dmz_uuid, dev->uuid)) {
+			char dev_uuid_buf[UUID_STR_LEN];
+			char sb_uuid_buf[UUID_STR_LEN];
+
+			uuid_unparse(dev->uuid, dev_uuid_buf);
+			uuid_unparse(sb->dmz_uuid, sb_uuid_buf);
+			dmz_err(dev, 0,
+				"DM-Zoned UUID mismatch (expected %s, read %s)\n",
+				dev_uuid_buf, sb_uuid_buf);
+			goto err;
+		}
+		if (!strlen((const char *)sb->dmz_label)) {
+			dmz_err(dev, 0,
+				"DM-Zoned label is null\n");
+			goto err;
+		} else if (!strlen(dev->label)) {
+			memcpy(dev->label, (const char *)sb->dmz_label, 32);
+		} else if (strncmp(dev->label, (const char *)sb->dmz_label, 32)) {
+			dmz_err(dev, 0,
+				"DM-Zoned label mismatch (expected %s, read %s)\n",
+				dev->label, sb->dmz_label);
+			goto err;
+		}
+		if (uuid_is_null(sb->dev_uuid)) {
+			dmz_err(dev, 0, "Device UUID is null\n");
+			goto err;
+		}
+		if (mset->id < 2) {
+			bdev = &dev->bdev[0];
+
+			if (uuid_is_null(bdev->uuid)) {
+				uuid_copy(bdev->uuid, sb->dev_uuid);
+			} else if (uuid_compare(bdev->uuid, sb->dev_uuid)) {
+				char dev_uuid_buf[UUID_STR_LEN];
+				char sb_uuid_buf[UUID_STR_LEN];
+
+				uuid_unparse(bdev->uuid, dev_uuid_buf);
+				uuid_unparse(sb->dmz_uuid, sb_uuid_buf);
+				dmz_err(dev, 0,
+					"Device UUID mismatch (expected %s, read %s)\n",
+					dev_uuid_buf, sb_uuid_buf);
+				goto err;
+			}
+		} else {
+			bdev = &dev->bdev[1];
+			uuid_copy(bdev->uuid, sb->dev_uuid);
+		}
+	}
 	/* Check location */
 	if (__le64_to_cpu(sb->sb_block) != mset->sb_block) {
 		dmz_err(dev, 0,
@@ -839,7 +897,8 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	mset->map_block = mset->sb_block + 1;
 	mset->bitmap_block = mset->map_block + dev->nr_map_blocks;
 
-	dmz_msg(dev, 0, "OK (generation %llu)\n", mset->gen);
+	dmz_msg(dev, 0, "OK (version %d, generation %llu)\n",
+		__le32_to_cpu(sb->version), mset->gen);
 
 	return 0;
 
@@ -970,6 +1029,18 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 	if (ret != 0)
 		return -1;
 
+	if (dev->bdev[1].name) {
+		mset[2].sb_block = dev->bdev[0].block_offset;
+		dmz_msg(dev, ind,
+			"Tertiary superblock at block %llu (zone %u)\n",
+			mset[2].sb_block,
+			dmz_block_zone_id(dev, mset[2].sb_block));
+		ret = dmz_check_sb(dev, &mset[2]);
+		if (ret != 0) {
+			mset[2].flags = 0;
+			return -1;
+		}
+	}
 	if (mset[1].flags & DMZ_MSET_SB_VALID &&
 	    !(mset[0].flags & DMZ_MSET_SB_VALID))
 		dmz_check_print_format(dev, ind + 2);
@@ -1063,13 +1134,15 @@ static int dmz_compare_meta(struct dmz_dev *dev,
  */
 int dmz_check(struct dmz_dev *dev)
 {
-	struct dmz_meta_set mset[2];
+	struct dmz_meta_set mset[3];
 	struct dmz_meta_set *check_mset = NULL;
 	int id, ret;
 
 	/* Init */
-	memset(mset, 0, sizeof(struct dmz_meta_set) * 2);
+	memset(mset, 0, sizeof(struct dmz_meta_set) * 3);
 	mset[1].id = 1;
+	mset[2].id = 2;
+	mset[2].flags = DMZ_MSET_VALID;
 
 	/* Check */
 	ret = dmz_check_superblocks(dev, mset);
@@ -1117,7 +1190,8 @@ int dmz_check(struct dmz_dev *dev)
 	}
 
 	if (mset[0].flags == DMZ_MSET_VALID &&
-	    mset[1].flags == DMZ_MSET_VALID)
+	    mset[1].flags == DMZ_MSET_VALID &&
+	    mset[2].flags == DMZ_MSET_VALID)
 		dmz_msg(dev, 0, "Done\n");
 	else
 		dmz_msg(dev, 0, "Running repair is recommended\n");
@@ -1179,13 +1253,15 @@ static int dmz_repair_sync_meta(struct dmz_dev *dev,
  */
 int dmz_repair(struct dmz_dev *dev)
 {
-	struct dmz_meta_set mset[2];
+	struct dmz_meta_set mset[3];
 	struct dmz_meta_set *check_mset = NULL;
 	int id, ret;
 
 	/* Init */
-	memset(mset, 0, sizeof(struct dmz_meta_set) * 2);
+	memset(mset, 0, sizeof(struct dmz_meta_set) * 3);
 	mset[1].id = 1;
+	mset[2].id = 2;
+	mset[2].flags = DMZ_MSET_VALID;
 	dev->flags |= DMZ_REPAIR;
 
 	/* Check */
@@ -1242,6 +1318,10 @@ int dmz_repair(struct dmz_dev *dev)
 	/* Sync device */
 	if (dmz_sync_dev(&dev->bdev[0]) < 0)
 		return -1;
+	if (dev->bdev[1].name) {
+		if (dmz_sync_dev(&dev->bdev[1]) < 0)
+			return -1;
+	}
 
 	return 0;
 }

@@ -53,8 +53,11 @@ void print_dev_info(struct dmz_block_dev *bdev)
 	printf("%s: %llu 512-byte sectors (%llu GiB)\n",
 	       bdev->path, bdev->capacity,
 	       (bdev->capacity << 9) / (1024ULL * 1024ULL * 1024ULL));
-	printf("  Host-%s device\n",
-	       (bdev->type == DMZ_TYPE_ZONED_HM) ? "managed" : "aware");
+	if (bdev->type == DMZ_TYPE_REGULAR)
+		printf("  Regular block device\n");
+	else
+		printf("  Host-%s device\n",
+		       (bdev->type == DMZ_TYPE_ZONED_HM) ? "managed" : "aware");
 
 }
 
@@ -71,6 +74,7 @@ int main(int argc, char **argv)
 	/* Initialize */
 	memset(&dev, 0, sizeof(dev));
 	dev.bdev[0].fd = -1;
+	dev.bdev[1].fd = -1;
 	dev.nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
 	dev.sb_version = DMZ_META_VER;
 
@@ -110,6 +114,10 @@ int main(int argc, char **argv)
 	/* Get device path */
 	dev.bdev[0].path = argv[2];
 	optnum = 3;
+	if (argc > optnum && strncmp(argv[3], "--", 2)) {
+		dev.bdev[1].path = argv[3];
+		optnum++;
+	}
 
 	/* Parse arguments */
 	for (i = optnum; i < argc; i++) {
@@ -191,7 +199,13 @@ int main(int argc, char **argv)
 	ret = dmz_init_dm(log_level);
 	if (ret <= 0)
 		return 1;
-
+	if (ret < (int)dev.sb_version) {
+		fprintf(stderr, "Falling back to metadata version %d\n", ret);
+		dev.sb_version = ret;
+	} else if (ret > (int)dev.sb_version) {
+		printf("Defaulting to metadata version %d from version %d\n",
+		       dev.sb_version, ret);
+	}
 	if (op == DMZ_OP_STOP) {
 		char holder[PATH_MAX];
 
@@ -208,11 +222,39 @@ int main(int argc, char **argv)
 	/* Open the device */
 	if (dmz_open_dev(&dev.bdev[0], op, dev.flags) < 0)
 		return 1;
-
+	if (!dmz_bdev_is_zoned(&dev.bdev[0])) {
+		fprintf(stderr,
+			"%s: Not a zoned block device\n",
+			dev.bdev[0].name);
+		dmz_close_dev(&dev.bdev[0]);
+		return 1;
+	}
 	print_dev_info(&dev.bdev[0]);
 	dev.capacity = dev.bdev[0].capacity;
 	dev.zone_nr_sectors = dev.bdev[0].zone_nr_sectors;
 	dev.zone_nr_blocks = dev.bdev[0].zone_nr_blocks;
+
+	if (dev.bdev[1].path) {
+		__u64 nr_zones;
+
+		if (dmz_open_dev(&dev.bdev[1], op, dev.flags) < 0)
+			return 1;
+		if (dmz_bdev_is_zoned(&dev.bdev[1])) {
+			fprintf(stderr,
+				"%s: Not a regular block device\n",
+				dev.bdev[1].name);
+			ret = 1;
+			goto out_close;
+		}
+		print_dev_info(&dev.bdev[1]);
+		dev.capacity += dev.bdev[1].capacity;
+		dev.bdev[1].zone_nr_sectors = dev.zone_nr_sectors;
+		dev.bdev[1].zone_nr_blocks = dev.zone_nr_blocks;
+		nr_zones = dev.bdev[1].capacity / dev.zone_nr_sectors;
+		if (dev.bdev[1].capacity % dev.zone_nr_sectors)
+			nr_zones++;
+		dev.bdev[0].block_offset = nr_zones * dev.zone_nr_blocks;
+	}
 
 	if (dmz_get_dev_zones(&dev) < 0)
 		return 1;
@@ -260,7 +302,10 @@ int main(int argc, char **argv)
 
 	free(dev.zones);
 	dev.zones = NULL;
+out_close:
 	dmz_close_dev(&dev.bdev[0]);
+	if (dev.bdev[1].name)
+		dmz_close_dev(&dev.bdev[1]);
 
 	return ret;
 }
