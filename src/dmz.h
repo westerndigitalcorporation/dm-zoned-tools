@@ -25,13 +25,14 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <linux/blkzoned.h>
+#include <uuid/uuid.h>
 
 /***** Type definitions *****/
 
 /*
  * Metadata version.
  */
-#define DMZ_META_VER	1
+#define DMZ_META_VER	2
 
 /*
  * On-disk super block magic.
@@ -85,8 +86,18 @@ struct dm_zoned_super {
 	/* Checksum */
 	__le32		crc;			/*  48 */
 
+	/* Fields added by Metadata version 2 */
+	/* DM-Zoned label */
+	__u8		dmz_label[32];		/*  80 */
+
+	/* DM-Zoned UUID */
+	__u8		dmz_uuid[16];		/*  96 */
+
+	/* Device UUID */
+	__u8		dev_uuid[16];		/*  112 */
+
 	/* Padding to full 512B sector */
-	__u8		reserved[464];		/* 512 */
+	__u8		reserved[400];		/* 512 */
 
 } __attribute__ ((packed));
 
@@ -171,6 +182,7 @@ struct dmz_block_dev {
 
 	enum dmz_dev_type type;
 
+	uuid_t		uuid;
 	__u64		capacity;
 
 	__u64		block_offset;
@@ -188,10 +200,11 @@ struct dmz_block_dev {
 struct dmz_dev {
 
 	/* Device block devices */
-	struct dmz_block_dev bdev[1];
+	struct dmz_block_dev bdev[2];
 	int		op;
 	unsigned int	flags;
 	char		label[32];
+	uuid_t		uuid;
 
 	/* Device info */
 	__u64		capacity;
@@ -332,7 +345,6 @@ dmz_zone_cond_str(struct blk_zone *zone)
 	return "Unknown-condition";
 }
 
-#define dmz_block_zone_id(dev, block)	((unsigned int)((block) / (dev)->zone_nr_blocks))
 #define dmz_zone_empty(z)	(dmz_zone_cond(z) == BLK_ZONE_COND_EMPTY)
 
 #define dmz_zone_sector(z)	(z)->start
@@ -342,6 +354,7 @@ dmz_zone_cond_str(struct blk_zone *zone)
 #define dmz_zone_need_reset(z)	(int)(z)->reset
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
+extern unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block);
 extern int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
 extern void dmz_close_dev(struct dmz_block_dev *dev);
 extern int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
