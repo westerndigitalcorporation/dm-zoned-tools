@@ -296,7 +296,7 @@ int dmz_start(struct dmz_dev *dev)
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,
-			"Failed to start %s", dev->label);
+			"Failed to start %s\n", dev->label);
 		return -1;
 	}
 	return 0;
