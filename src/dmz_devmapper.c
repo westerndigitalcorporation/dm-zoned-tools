@@ -55,8 +55,8 @@ int dmz_init_dm(int log_level)
 				       tgt->version[0], tgt->version[1],
 				       tgt->version[2]);
 			ret = 0;
-			if (tgt->version[0] == 1) {
-				ret = tgt->version[1];
+			if (tgt->version[0] == 1 || tgt->version[0] == 2) {
+				ret = tgt->version[0];
 				break;
 			}
 			fprintf(stderr,
