@@ -40,6 +40,7 @@ static void dmzadm_usage(void)
 
 	printf("Format operation options\n"
 	       "  --force	: Force overwrite of existing content\n"
+	       "  --label=<str> : Set the name to <str>\n"
 	       "  --seq=<num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
@@ -124,6 +125,27 @@ int main(int argc, char **argv)
 					"Invalid number of sequential zones\n");
 				return 1;
 			}
+
+		} else if (strncmp(argv[i], "--label=", 8) == 0) {
+			const char *label = argv[i] + 8;
+			unsigned int label_size = strlen(label);
+
+			if (op != DMZ_OP_FORMAT) {
+				fprintf(stderr,
+					"--label option is valid only with the "
+					"format operation\n");
+				return 1;
+			}
+			if (label[0] == '\'' || label[0] == '\"') {
+				label++;
+				label_size -= 2;
+			}
+			if (label_size > 31) {
+				fprintf(stderr,
+					"Label too long (max 16 characters)\n");
+				return 1;
+			}
+			memcpy(dev.label, label, label_size);
 
 		} else if (strcmp(argv[i], "--force") == 0) {
 

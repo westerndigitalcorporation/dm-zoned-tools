@@ -189,7 +189,9 @@ int dmz_start(struct dmz_dev *dev)
 		return -1;
 	}
 
-	sprintf(dev->label, "dmz-%s", dev->name);
+	/* Generate dm name if not set */
+	if (!strlen(dev->label))
+		sprintf(dev->label, "dmz-%s", dev->name);
 
 	printf("%s: starting %s\n",
 	       dev->name, dev->label);
