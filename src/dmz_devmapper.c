@@ -70,6 +70,7 @@ int dmz_init_dm(int log_level)
 	dm_task_destroy(dmt);
 	if (ret < 0)
 		fprintf(stderr, "dm-zoned target not supported\n");
+
 	return ret;
 }
 
@@ -88,7 +89,7 @@ int dmz_create_dm(struct dmz_dev *dev)
 	 */
 	capacity = dev->nr_chunks * dev->zone_nr_sectors;
 
-	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
+	if (!(dmt = dm_task_create(DM_DEVICE_CREATE)))
 		return -ENOMEM;
 
 	if (!dm_task_set_name (dmt, dev->label))
@@ -99,7 +100,7 @@ int dmz_create_dm(struct dmz_dev *dev)
 	else
 		sprintf(params, "%s", dev->bdev[0].path);
 
-	if (!dm_task_add_target (dmt, 0, capacity, "zoned", params))
+	if (!dm_task_add_target(dmt, 0, capacity, "zoned", params))
 		goto out;
 
 	if (dev->flags & DMZ_VERBOSE)
@@ -138,22 +139,21 @@ int dmz_check_dm_target(struct dmz_dev *dev, char *dm_dev)
 	uint64_t start, length;
 	char *target_type, *params;
 
-	if (!(dmt = dm_task_create (DM_DEVICE_TABLE)))
+	if (!(dmt = dm_task_create(DM_DEVICE_TABLE)))
 		return -ENOMEM;
 
-	if (!dm_task_set_name (dmt, dm_dev)) {
+	if (!dm_task_set_name(dmt, dm_dev)) {
 		ret = -ENOMEM;
 		goto out;
 	}
 
 	dm_task_no_open_count(dmt);
 
-	if (!dm_task_run (dmt)) {
+	if (!dm_task_run(dmt)) {
 		ret = -EINVAL;
 		goto out;
 	}
-	dm_get_next_target(dmt, NULL, &start, &length,
-			   &target_type, &params);
+	dm_get_next_target(dmt, NULL, &start, &length, &target_type, &params);
 	if (strlen(target_type) == 5 &&
 	    !strncmp(target_type, "zoned", 5)) {
 		strcpy(dev->label, dm_task_get_name(dmt));
@@ -172,10 +172,10 @@ int dmz_deactivate_dm(char *dm_dev)
 	uint32_t cookie = 0;
 	__u16 udev_flags = DM_UDEV_DISABLE_LIBRARY_FALLBACK;
 
-	if (!(dmt = dm_task_create (DM_DEVICE_REMOVE)))
+	if (!(dmt = dm_task_create(DM_DEVICE_REMOVE)))
 		return -ENOMEM;
 
-	if (!dm_task_set_name (dmt, dm_dev)) {
+	if (!dm_task_set_name(dmt, dm_dev)) {
 		goto out;
 	}
 
@@ -296,9 +296,10 @@ int dmz_start(struct dmz_dev *dev)
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,
-			"Failed to start %s", dev->label);
+			"Failed to start %s\n", dev->label);
 		return -1;
 	}
+
 	return 0;
 }
 
@@ -332,5 +333,6 @@ int dmz_stop(struct dmz_dev *dev, char *dm_name)
 			dev->bdev[0].name, dev->label);
 		return ret;
 	}
+
 	return 0;
 }
