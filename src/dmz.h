@@ -219,7 +219,7 @@ struct dmz_dev {
 	unsigned int	nr_meta_blocks;
 	unsigned int	nr_reserved_seq;
 	unsigned int	nr_chunks;
-	unsigned int	nr_useable_zones;
+	unsigned int	nr_usable_zones;
 	unsigned int	max_nr_meta_zones;
 	unsigned int	last_meta_zone;
 	unsigned int	total_nr_meta_zones;

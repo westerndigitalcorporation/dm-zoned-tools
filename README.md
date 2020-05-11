@@ -72,7 +72,7 @@ The zones of the device are separated into 2 types:
 1) Metadata zones: these are randomly writeable zones used to store metadata.
 Randomly writeable zones may be conventional zones or sequential write
 preferred zones (host-aware devices only). Metadata zones are not reported as
-useable capacity to the user.
+usable capacity to the user.
 
 2) Data zones: All remaining zones, the majority of which will be sequential
 zones. These are used exclusively to store user data. The conventional zones

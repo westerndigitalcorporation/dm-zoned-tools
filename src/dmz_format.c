@@ -250,8 +250,8 @@ int dmz_format(struct dmz_dev *dev)
 				       bdev->name, bdev->block_offset);
 			}
 		}
-		printf("  %u useable zones\n",
-		       dev->nr_useable_zones);
+		printf("  %u useble zones\n",
+		       dev->nr_usable_zones);
 		printf("  Primary meta-data set: %u metadata blocks from block %llu (zone %u)\n",
 		       dev->nr_meta_blocks,
 		       dev->sb_block,
@@ -268,7 +268,7 @@ int dmz_format(struct dmz_dev *dev)
 		       dev->total_nr_meta_zones);
 
 		dev->nr_cache_zones -= dev->total_nr_meta_zones;
-		nr_data_zones = dev->nr_useable_zones
+		nr_data_zones = dev->nr_usable_zones
 			- (dev->total_nr_meta_zones + dev->nr_cache_zones +
 			dev->nr_reserved_seq);
 		printf("  %u data chunks capacity\n",

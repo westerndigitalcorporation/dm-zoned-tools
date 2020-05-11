@@ -860,7 +860,7 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	/* Check the number of data chunks */
 	dev->nr_meta_zones = DIV_ROUND_UP(__le64_to_cpu(sb->nr_meta_blocks),
 					  dev->zone_nr_blocks);
-	dev->nr_chunks = dev->nr_useable_zones -
+	dev->nr_chunks = dev->nr_usable_zones -
 		((dev->nr_meta_zones * 2) + dev->nr_reserved_seq);
 	if (__le32_to_cpu(sb->nr_chunks) != dev->nr_chunks) {
 		dmz_err(dev, 0,
@@ -918,8 +918,8 @@ static void dmz_check_print_format(struct dmz_dev *dev,
 	if (!(dev->flags & DMZ_VERBOSE))
 		return;
 
-	dmz_msg(dev, ind, "%u useable zones\n",
-		dev->nr_useable_zones);
+	dmz_msg(dev, ind, "%u usable zones\n",
+		dev->nr_usable_zones);
 	dmz_msg(dev, ind, "%u metadata blocks per set\n",
 		dev->nr_meta_blocks);
 	dmz_msg(dev, ind + 2, "Super block at block %llu and %llu\n",
@@ -934,7 +934,7 @@ static void dmz_check_print_format(struct dmz_dev *dev,
 		dev->total_nr_meta_zones);
 
 	dev->nr_cache_zones -= dev->total_nr_meta_zones;
-	nr_data_zones = dev->nr_useable_zones
+	nr_data_zones = dev->nr_usable_zones
 		- (dev->total_nr_meta_zones + dev->nr_cache_zones +
 		   dev->nr_reserved_seq);
 	dmz_msg(dev, ind, "%u data chunks capacity\n",
