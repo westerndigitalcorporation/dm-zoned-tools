@@ -44,11 +44,11 @@ dmz_block_to_bdev(struct dmz_dev *dev, __u64 block, __u64 *ret_block)
 	if (!dev->bdev[1].name)
 		return &dev->bdev[0];
 
-	if (block < dev->bdev[0].block_offset)
-		return &dev->bdev[1];
+	if (block < dev->bdev[1].block_offset)
+		return &dev->bdev[0];
 
-	*ret_block -= dev->bdev[0].block_offset;
-	return &dev->bdev[0];
+	*ret_block -= dev->bdev[1].block_offset;
+	return &dev->bdev[1];
 }
 
 unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block)
@@ -297,17 +297,17 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 
 	sector = 0;
 	while (sector < dev->capacity) {
-		__u64 sector_offset = dmz_blk2sect(dev->bdev[0].block_offset);
+		__u64 sector_offset = dmz_blk2sect(dev->bdev[1].block_offset);
 		__u64 bdev_sector;
 
 		if (!dev->bdev[1].name) {
 			bdev = &dev->bdev[0];
 			bdev_sector = sector;
 		} else if (sector < sector_offset) {
-			bdev = &dev->bdev[1];
+			bdev = &dev->bdev[0];
 			bdev_sector = sector;
 		} else {
-			bdev = &dev->bdev[0];
+			bdev = &dev->bdev[1];
 			bdev_sector = sector - sector_offset;
 		}
 		if (bdev->type == DMZ_TYPE_REGULAR) {
