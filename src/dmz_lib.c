@@ -48,7 +48,7 @@ int dmz_reset_zone(struct dmz_dev *dev,
 		   struct blk_zone *zone)
 {
 	struct blk_zone_range range;
-	struct dmz_block_dev *bdev = &dev->bdev[0];
+	struct dmz_block_dev *bdev = &dev->bdev[1];
 
 	if (dmz_zone_conv(zone) ||
 	    dmz_zone_empty(zone))
@@ -56,7 +56,7 @@ int dmz_reset_zone(struct dmz_dev *dev,
 
 	/* Non empty sequential zone: reset */
 	range.sector = dmz_zone_sector(zone) -
-		dmz_blk2sect(dev->bdev[0].block_offset);
+		dmz_blk2sect(dev->bdev[1].block_offset);
 	range.nr_sectors = dmz_zone_length(zone);
 	if (ioctl(bdev->fd, BLKRESETZONE, &range) < 0) {
 		fprintf(stderr,
