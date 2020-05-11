@@ -102,12 +102,12 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	if (dev->flags & DMZ_VERBOSE)
 		printf("Locating metadata...\n");
 
-	dev->nr_useable_zones = 0;
+	dev->nr_usable_zones = 0;
 	dev->max_nr_meta_zones = 0;
 	dev->last_meta_zone = 0;
 	dev->nr_cache_zones = 0;
 
-	/* Count useable zones */
+	/* Count usable zones */
 	for (i = 0; i < dev->nr_zones; i++) {
 
 		zone = &dev->zones[i];
@@ -135,7 +135,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 				continue;
 			}
 		}
-		dev->nr_useable_zones++;
+		dev->nr_usable_zones++;
 	}
 
 	/*
@@ -155,9 +155,9 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	 */
 	if (dev->nr_reserved_seq > dev->nr_cache_zones)
 		dev->nr_reserved_seq = dev->nr_cache_zones - 1;
-	if (dev->nr_reserved_seq >= dev->nr_useable_zones) {
+	if (dev->nr_reserved_seq >= dev->nr_usable_zones) {
 		fprintf(stderr,
-			"%s: Not enough useable zones found\n",
+			"%s: Not enough usable zones found\n",
 			dev->label);
 		return -1;
 	}
@@ -166,7 +166,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 
 	/*
 	 * To facilitate addressing of the bitmap blocks, create
-	 * one bitmap per zone, including meta zones and unuseable
+	 * one bitmap per zone, including meta zones and unusable
 	 * read-only and offline zones.
 	 */
 	dev->zone_nr_bitmap_blocks =
@@ -175,7 +175,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	nr_bitmap_zones = (dev->nr_bitmap_blocks + dev->zone_nr_blocks - 1)
 		/ dev->zone_nr_blocks;
 
-	if ((nr_bitmap_zones + dev->nr_reserved_seq) > dev->nr_useable_zones) {
+	if ((nr_bitmap_zones + dev->nr_reserved_seq) > dev->nr_usable_zones) {
 		fprintf(stderr,
 			"%s: Not enough zones\n",
 			dev->label);
@@ -184,10 +184,10 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 
 	/*
 	 * Not counting the mapping table, the maximum number of chunks
-	 * is the number of useable zones minus the bitmap zones and the
+	 * is the number of usable zones minus the bitmap zones and the
 	 * number of reserved zones.
 	 */
-	nr_chunks = dev->nr_useable_zones -
+	nr_chunks = dev->nr_usable_zones -
 		(nr_bitmap_zones + dev->nr_reserved_seq);
 
 	/* Assuming the maximum number of chunks, get the mapping table size */
@@ -216,7 +216,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	 * Now, fix the number of chunks and the mapping table size to
 	 * make sure that everything fits on the drive.
 	 */
-	dev->nr_chunks = dev->nr_useable_zones -
+	dev->nr_chunks = dev->nr_usable_zones -
 		(dev->total_nr_meta_zones + dev->nr_reserved_seq);
 	dev->nr_map_blocks = DIV_ROUND_UP(dev->nr_chunks, DMZ_MAP_ENTRIES);
 	dev->map_block = dev->sb_block + 1;
