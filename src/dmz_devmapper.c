@@ -261,8 +261,6 @@ out:
 int dmz_start(struct dmz_dev *dev)
 {
 	/* Calculate metadata location */
-	if (dev->flags & DMZ_VERBOSE)
-		printf("Locating metadata...\n");
 	if (dmz_locate_metadata(dev) < 0) {
 		fprintf(stderr,
 			"Failed to locate metadata\n");

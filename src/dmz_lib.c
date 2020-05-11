@@ -99,6 +99,9 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	unsigned int nr_chunks, nr_meta_zones;
 	unsigned int nr_bitmap_zones;
 
+	if (dev->flags & DMZ_VERBOSE)
+		printf("Locating metadata...\n");
+
 	dev->nr_useable_zones = 0;
 	dev->max_nr_meta_zones = 0;
 	dev->last_meta_zone = 0;
