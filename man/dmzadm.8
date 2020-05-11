@@ -12,7 +12,7 @@ mapper
 .I operation
 >
 <
-.I zoned-block-device
+.I [regular-block-device] zoned-block-device
 >
 [
 .I options
@@ -22,9 +22,11 @@ mapper
 .B dmzadm
 is used to format, check and repair a zoned block device used with the dm-zoned
 device mapper. 
-\fIzoned-block-device\fP is the special file corresponding to the target zoned
+\fIzoned-block-device\fP is the device node corresponding to the target zoned
 blocks device (e.g.
 \fI/dev/sdXX\fP).
+\fIregular-block-device\fP is the optional device node corresponding to a
+regular block device to be used together with the zoned block devoce.
 \fIoperation\fP specifies the action to be taken for the device.
 .PP
 The exit code returned by
@@ -37,28 +39,29 @@ dmzadm allows the following operations.
 
 .TP
 .B Format
-Write to the zoned block device dm-zoned metadata, whiping clean all data that
-was stored on the device.
+Write to the zoned block device and optional regular block device dm-zoned
+metadata, whiping clean all data that was stored on the device.
 
 .TP
 .B Check
-Check the zoned block device metadata consistency. No repair action is taken.
+Check the device(s) metadata consistency. No repair action is taken.
 Errors are not corrected with this operation. For repairing incorrect metadata,
 the
 \fIRepair\fP operation must be used.
 
 .TP
 .B Repair
-Check the zoned block device metadata consistency and try to repair any error
+Check the device metadata consistency and try to repair any error
 detected.
 
 .TP
 .B Start
-Load the metadata information from disk and activate the device-mapper target.
+Load the metadata information from disk(s) and activate the device-mapper
+target.
 
 .TP
 .B Stop
-Deactivate the device-mapper target associated with the zoned block device.
+Deactivate the device-mapper target associated with the block device(s).
 
 .TP
 .B Help
@@ -71,22 +74,22 @@ Options for selecting an operation are:
 
 .TP
 .BR \-\-format
-Format a zoned block device.
+Format the specified block device(s).
 
 .TP
 .BR \-\-check
-Check a zoned block device metadata.
+Check the specified block device(s) metadata.
 
 .TP
 .BR \-\-repair
-Check a zoned block device metadata and attempt to repair any error found.
+Check the block device(s) metadata and attempt to repair any error found.
 
 .TP
 .BR \-\-start
-Load zoned block device metadata and activate the device-mapper target.
+Load block device(s) metadata and activate the device-mapper target.
 
 .TP
-.BR \-\-start
+.BR \-\-stop
 Deactivate the device-mapper target for a zoned block device.
 
 .TP

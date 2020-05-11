@@ -55,7 +55,7 @@ int dmz_init_dm(int log_level)
 				       tgt->version[0], tgt->version[1],
 				       tgt->version[2]);
 			ret = 0;
-			if (tgt->version[0] == 1 || tgt->version[0] == 2) {
+			if (tgt->version[0] <= DMZ_META_VER) {
 				ret = tgt->version[0];
 				break;
 			}
@@ -88,18 +88,18 @@ int dmz_create_dm(struct dmz_dev *dev)
 	 */
 	capacity = dev->nr_chunks * dev->zone_nr_sectors;
 
-	if (!(dmt = dm_task_create(DM_DEVICE_CREATE)))
+	if (!(dmt = dm_task_create (DM_DEVICE_CREATE)))
 		return -ENOMEM;
 
-	if (!dm_task_set_name(dmt, dev->label))
+	if (!dm_task_set_name (dmt, dev->label))
 		goto out;
 
 	if (dev->sb_version > 1 && dev->bdev[1].path)
-		sprintf(params, "%s %s", dev->bdev[1].path, dev->bdev[0].path);
+		sprintf(params, "%s %s", dev->bdev[0].path, dev->bdev[1].path);
 	else
 		sprintf(params, "%s", dev->bdev[0].path);
 
-	if (!dm_task_add_target(dmt, 0, capacity, "zoned", params))
+	if (!dm_task_add_target (dmt, 0, capacity, "zoned", params))
 		goto out;
 
 	if (dev->flags & DMZ_VERBOSE)
@@ -296,7 +296,7 @@ int dmz_start(struct dmz_dev *dev)
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,
-			"Failed to start %s\n", dev->label);
+			"Failed to start %s", dev->label);
 		return -1;
 	}
 	return 0;
