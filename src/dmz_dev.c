@@ -320,7 +320,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 				zone_len = bdev->capacity - blkz->start;
 			blkz->len = zone_len;
 			blkz->wp = (__u64)-1;
-			blkz->type = BLK_ZONE_TYPE_CONVENTIONAL;
+			blkz->type = BLK_ZONE_TYPE_UNKNOWN;
 			blkz->cond = BLK_ZONE_COND_NOT_WP;
 			dev->nr_zones++;
 			sector += dev->zone_nr_sectors;
