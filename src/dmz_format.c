@@ -47,10 +47,10 @@ int dmz_write_super(struct dmz_dev *dev,
 
 	bdev_sb_block = sb_block;
 	if (dev->bdev[1].name) {
-		if (sb_block >= dev->bdev[0].block_offset)
-			bdev_sb_block -= dev->bdev[0].block_offset;
-		else
+		if (sb_block >= dev->bdev[1].block_offset) {
+			bdev_sb_block -= dev->bdev[1].block_offset;
 			bdev = &dev->bdev[1];
+		}
 	}
 
 	printf("  Writing super block to %s block %llu\n",
@@ -303,7 +303,7 @@ int dmz_format(struct dmz_dev *dev)
 
 	if (dev->sb_version > 1 && dev->bdev[1].name) {
 		printf("Writing tertiary metadata\n");
-		if (dmz_write_super(dev, 0, dev->bdev[0].block_offset) < 0)
+		if (dmz_write_super(dev, 0, dev->bdev[1].block_offset) < 0)
 			return -1;
 	}
 
