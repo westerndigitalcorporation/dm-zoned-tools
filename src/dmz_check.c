@@ -1030,7 +1030,7 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 		return -1;
 
 	if (dev->bdev[1].name) {
-		mset[2].sb_block = dev->bdev[0].block_offset;
+		mset[2].sb_block = dev->bdev[1].block_offset;
 		dmz_msg(dev, ind,
 			"Tertiary superblock at block %llu (zone %u)\n",
 			mset[2].sb_block,
