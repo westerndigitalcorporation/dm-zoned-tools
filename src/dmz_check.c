@@ -327,9 +327,9 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	if (dzone_id < dev->nr_zones) {
 		mset->nr_buf_chunks++;
 		dzone = &dev->zones[dzone_id];
-		if (dmz_zone_rnd(dzone)) {
+		if (dmz_zone_is_cache(dev, dzone)) {
 			dmz_err(dev, ind,
-				"Chunk %u: mapped to random zone %u "
+				"Chunk %u: mapped to cache zone %u "
 				"but using buffer zone %u\n",
 				chunk, dzone_id, bzone_id);
 			errors++;
@@ -352,9 +352,9 @@ static int dmz_check_chunk_mapping(struct dmz_dev *dev,
 	}
 
 	bzone = &dev->zones[bzone_id];
-	if (!dmz_zone_rnd(bzone)) {
+	if (!dmz_zone_is_cache(dev, bzone)) {
 		dmz_err(dev, ind,
-			"Chunk %u: buffer zone %u is not a random zone\n",
+			"Chunk %u: buffer zone %u is not a cache zone\n",
 			chunk, bzone_id);
 		errors++;
 		if (dmz_repair_dev(dev))
@@ -508,7 +508,7 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 	 * write required zones.
 	 */
 	if (dzone_id == bzone_id ||
-	    (dmz_zone_rnd(zone) && (bzone_id == DMZ_MAP_UNMAPPED)))
+	    (dmz_zone_is_cache(dev, zone) && (bzone_id == DMZ_MAP_UNMAPPED)))
 		return 0;
 
 	/* Read in the zone bitmap */
@@ -849,11 +849,11 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 
 	/* Check the number of reserved sequential zones */
 	dev->nr_reserved_seq = __le32_to_cpu(sb->nr_reserved_seq);
-	if (dev->nr_reserved_seq > dev->nr_rnd_zones) {
+	if (dev->nr_reserved_seq > dev->nr_cache_zones) {
 		dmz_err(dev, 0,
 			"invalid number of reserved sequential zones "
 			"(expected less than %u, read %u)\n",
-			dev->nr_rnd_zones, dev->nr_reserved_seq);
+			dev->nr_cache_zones, dev->nr_reserved_seq);
 		goto err;
 	}
 
@@ -913,7 +913,7 @@ err:
 static void dmz_check_print_format(struct dmz_dev *dev,
 				   int ind)
 {
-	unsigned int nr_seq_data_zones;
+	unsigned int nr_data_zones;
 
 	if (!(dev->flags & DMZ_VERBOSE))
 		return;
@@ -933,18 +933,18 @@ static void dmz_check_print_format(struct dmz_dev *dev,
 		dev->nr_meta_zones,
 		dev->total_nr_meta_zones);
 
-	dev->nr_rnd_zones -= dev->total_nr_meta_zones;
-	nr_seq_data_zones = dev->nr_useable_zones
-		- (dev->total_nr_meta_zones + dev->nr_rnd_zones +
+	dev->nr_cache_zones -= dev->total_nr_meta_zones;
+	nr_data_zones = dev->nr_useable_zones
+		- (dev->total_nr_meta_zones + dev->nr_cache_zones +
 		   dev->nr_reserved_seq);
 	dmz_msg(dev, ind, "%u data chunks capacity\n",
 		dev->nr_chunks);
-	dmz_msg(dev, ind + 2, "%u random zone%s\n",
-		dev->nr_rnd_zones,
-		dev->nr_rnd_zones > 1 ? "s" : "");
-	dmz_msg(dev, ind + 2, "%u sequential zone%s\n",
-		nr_seq_data_zones,
-		nr_seq_data_zones > 1 ? "s" : "");
+	dmz_msg(dev, ind + 2, "%u cache zone%s\n",
+		dev->nr_cache_zones,
+		dev->nr_cache_zones > 1 ? "s" : "");
+	dmz_msg(dev, ind + 2, "%u data zone%s\n",
+		nr_data_zones,
+		nr_data_zones > 1 ? "s" : "");
 	dmz_msg(dev, ind, "%u sequential zone%s reserved for reclaim\n",
 		dev->nr_reserved_seq,
 		dev->nr_reserved_seq > 1 ? "s" : "");

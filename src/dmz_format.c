@@ -225,7 +225,7 @@ int dmz_format(struct dmz_dev *dev)
 			uuid_generate_random(dev->bdev[1].uuid);
 	}
 	if (dev->flags & DMZ_VERBOSE) {
-		unsigned int nr_seq_data_zones;
+		unsigned int nr_data_zones;
 
 		printf("Format metadata %d:\n", dev->sb_version);
 		if (dev->sb_version > 1) {
@@ -267,18 +267,18 @@ int dmz_format(struct dmz_dev *dev)
 		       dev->nr_meta_zones,
 		       dev->total_nr_meta_zones);
 
-		dev->nr_rnd_zones -= dev->total_nr_meta_zones;
-		nr_seq_data_zones = dev->nr_useable_zones
-			- (dev->total_nr_meta_zones + dev->nr_rnd_zones +
+		dev->nr_cache_zones -= dev->total_nr_meta_zones;
+		nr_data_zones = dev->nr_useable_zones
+			- (dev->total_nr_meta_zones + dev->nr_cache_zones +
 			dev->nr_reserved_seq);
 		printf("  %u data chunks capacity\n",
 		       dev->nr_chunks);
-		printf("    %u random zone%s\n",
-		       dev->nr_rnd_zones,
-		       dev->nr_rnd_zones > 1 ? "s" : "");
-		printf("    %u sequential zone%s\n",
-		       nr_seq_data_zones,
-		       nr_seq_data_zones > 1 ? "s" : "");
+		printf("    %u cache zone%s\n",
+		       dev->nr_cache_zones,
+		       dev->nr_cache_zones > 1 ? "s" : "");
+		printf("    %u data zone%s\n",
+		       nr_data_zones,
+		       nr_data_zones > 1 ? "s" : "");
 		printf("  %u sequential zone%s reserved for reclaim\n",
 		       dev->nr_reserved_seq,
 		       dev->nr_reserved_seq > 1 ? "s" : "");
