@@ -50,7 +50,8 @@ int dmz_reset_zone(struct dmz_dev *dev,
 	struct blk_zone_range range;
 	struct dmz_block_dev *bdev = &dev->bdev[1];
 
-	if (dmz_zone_conv(zone) ||
+	if (dmz_zone_unknown(zone) ||
+	    dmz_zone_conv(zone) ||
 	    dmz_zone_empty(zone))
 		return 0;
 
@@ -101,14 +102,14 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	dev->nr_useable_zones = 0;
 	dev->max_nr_meta_zones = 0;
 	dev->last_meta_zone = 0;
-	dev->nr_rnd_zones = 0;
+	dev->nr_cache_zones = 0;
 
 	/* Count useable zones */
 	for (i = 0; i < dev->nr_zones; i++) {
 
 		zone = &dev->zones[i];
 
-		if (dmz_zone_rnd(zone)) {
+		if (dmz_zone_is_cache(dev, zone)) {
 			if (dev->sb_zone == NULL) {
 				dev->sb_zone = zone;
 				dev->last_meta_zone = i;
@@ -117,7 +118,7 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 				dev->last_meta_zone = i;
 				dev->max_nr_meta_zones++;
 			}
-			dev->nr_rnd_zones++;
+			dev->nr_cache_zones++;
 		} else {
 			if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
 				printf("  Ignoring read-only zone %u\n",
@@ -135,10 +136,10 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	}
 
 	/*
-	 * Randomly writeable zones are mandatory: at least 3
+	 * Cache zones are mandatory: at least 3
 	 * (two for metadata and one for bufferring random writes).
 	 */
-	if (dev->nr_rnd_zones < 3) {
+	if (dev->nr_cache_zones < 3) {
 		fprintf(stderr,
 			"%s: Not enough random zones found\n",
 			dev->label);
@@ -149,8 +150,8 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	 * It does not make sense to have more reserved
 	 * sequential zones than random zones.
 	 */
-	if (dev->nr_reserved_seq > dev->nr_rnd_zones)
-		dev->nr_reserved_seq = dev->nr_rnd_zones - 1;
+	if (dev->nr_reserved_seq > dev->nr_cache_zones)
+		dev->nr_reserved_seq = dev->nr_cache_zones - 1;
 	if (dev->nr_reserved_seq >= dev->nr_useable_zones) {
 		fprintf(stderr,
 			"%s: Not enough useable zones found\n",
@@ -198,13 +199,13 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 			 / dev->zone_nr_blocks);
 	dev->total_nr_meta_zones = nr_meta_zones << 1;
 
-	if (dev->total_nr_meta_zones > dev->nr_rnd_zones) {
+	if (dev->total_nr_meta_zones > dev->nr_cache_zones) {
 		fprintf(stderr,
-			"%s: Insufficient number of random zones "
+			"%s: Insufficient number of cache zones "
 			"(need %u, have %u)\n",
 			dev->label,
 			dev->total_nr_meta_zones,
-			dev->nr_rnd_zones);
+			dev->nr_cache_zones);
 		return -1;
 	}
 

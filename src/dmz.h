@@ -23,11 +23,15 @@
 #include "config.h"
 
 #include <limits.h>
+#include <stdbool.h>
 #include <sys/types.h>
 #include <linux/blkzoned.h>
 #include <uuid/uuid.h>
 
 /***** Type definitions *****/
+
+/* Unknown block zone type */
+#define BLK_ZONE_TYPE_UNKNOWN	0
 
 /*
  * Metadata version.
@@ -161,6 +165,7 @@ enum dmz_dev_type {
 #define DMZ_VVERBOSE		0x00000002
 #define DMZ_REPAIR		0x00000004
 #define DMZ_OVERWRITE		0x00000008
+#define DMZ_CACHE		0x00000010
 
 /*
  * Operations.
@@ -218,7 +223,7 @@ struct dmz_dev {
 	unsigned int	max_nr_meta_zones;
 	unsigned int	last_meta_zone;
 	unsigned int	total_nr_meta_zones;
-	unsigned int	nr_rnd_zones;
+	unsigned int	nr_cache_zones;
 
 	struct blk_zone	*zones;
 
@@ -300,10 +305,19 @@ static inline void dmz_clear_bit(__u8 *bitmap,
 #define dmz_bdev_is_zoned(bdev)	(dmz_bdev_is_ha(bdev) || dmz_bdev_is_hm(bdev))
 
 #define dmz_zone_type(z)	(z)->type
+#define dmz_zone_unknown(z)	((z)->type == BLK_ZONE_TYPE_UNKNOWN)
 #define dmz_zone_conv(z)	((z)->type == BLK_ZONE_TYPE_CONVENTIONAL)
 #define dmz_zone_seq_req(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_REQ)
 #define dmz_zone_seq_pref(z)	((z)->type == BLK_ZONE_TYPE_SEQWRITE_PREF)
 #define dmz_zone_rnd(z)		(dmz_zone_conv(z) || dmz_zone_seq_pref(z))
+
+static inline bool dmz_zone_is_cache(struct dmz_dev *dev, struct blk_zone *zone)
+{
+	if (dev->bdev[1].name)
+		return dmz_zone_unknown(zone);
+	else
+		return dmz_zone_rnd(zone);
+}
 
 static inline const char *
 dmz_zone_type_str(struct blk_zone *zone)
