@@ -18,17 +18,12 @@ devices (e.g. the f2fs file system since kernel 4.10) do not need to use the
 dm-zoned device mapper.
 
 For a more detailed description of the zoned block device models and
-their constraints see (for SCSI devices):
+their constraints see the [T10 ZBC specification](http://www.t10.org/drafts.htm#ZBC_Family)
+for SCSI devices, and the [T13 ZAC specification](http://www.t13.org/Documents/UploadedDocuments/docs2015/di537r05-Zoned_Device_ATA_Command_Set_ZAC.pdf) for ATA devices.
 
-http://www.t10.org/drafts.htm#ZBC_Family
-
-and (for ATA devices):
-
-http://www.t13.org/Documents/UploadedDocuments/docs2015/di537r05-Zoned_Device_ATA_Command_Set_ZAC.pdf
-
-dm-zoned implementation focused on simplicity and on minimizing overhead (CPU,
+*dm-zoned* implementation focuses on simplicity and on minimizing overhead (CPU,
 memory and storage overhead). For a 10TB host-managed disk with 256 MB zones,
-dm-zoned memory usage per disk instance is at most 4.5 MB and as little as 5
+*dm-zoned* memory usage per disk instance is at most 4.5 MB and as little as 5
 zones will be used internally for storing metadata and performaing reclaim
 operations.
 
@@ -164,14 +159,14 @@ automake and libtool packages).
 > make
 ```
 
-To install the compiled dmzadm executable file, simply execute as root the
+To install the compiled *dmzadm* executable file, simply execute as root the
 following command.
 
 ```
 > make install
 ```
 
-The default installation directory is /usr/sbin. This default location can be
+The default installation directory is `/usr/sbin`. This default location can be
 changed using the configure script. Executing the following command displays
 the options used to control the installation path.
 
@@ -182,16 +177,16 @@ the options used to control the installation path.
 
 ## IV. Usage
 
-The dm-zoned device mapper is included with the mainline Linux kernel code
-since version 4.13.0. dm-zoned compilation must be enabled in the kernel
-configuration. This can be done by setting the CONFIG_DM_ZONED configuration
+The *dm-zoned* device mapper is included with the mainline Linux kernel code
+since version 4.13.0. *dm-zoned* compilation must be enabled in the kernel
+configuration. This can be done by setting the *CONFIG_DM_ZONED* configuration
 parameter to "y" or "m" (menu: Device Derivers -> Multiple devices driver
 support (RAID and LVM) -> Drive-managed zoned block device target support).
 
-Since kernel 4.16.0, using the deadline or mq-deadline scheduler with zoned
+Since kernel 4.16.0, using the *deadline* or *mq-deadline* scheduler with zoned
 block devices is also necessary to avoid write request reordering leading to I/O
 errors. A zoned block device must be setup with this scheduler before executing
-the dmzadm tool.
+the *dmzadm* tool.
 
 ```
 # echo deadline > /sys/block/<disk name>/queue scheduler
@@ -206,80 +201,80 @@ ACTION=="add|change", KERNEL=="sd*[!0-9]", ATTRS{queue/zoned}=="host-managed", \
         ATTR{queue/scheduler}="deadline"
 ```
 
-To create a dm-zoned target device, a zoned block device must first be
+To create a *dm-zoned* target device, a zoned block device must first be
 formatted using the dmzadm tool. This tool will analyze the device zone
 configuration, determine where to place the metadata sets and initialize on
-disk the metadata used by the dm-zoned target driver.
+disk the metadata used by the *dm-zoned* target driver.
 
 ```
 > dmzadm --format /dev/sdxx
 ```
 
-dmzadm detailed usage is as follows:
+*dmzadm* detailed usage is as follows:
 
 ```
 > dmzadm --help
+dmzadm allows formatting, checking and repairing
+a zoned block device for use with the dm-zoned
+device mapper.
 Usage: dmzadm <operation> <device path> [options]
-Operations:
-	--help | -h	: General help message
-	--format	: Format a block device metadata
-	--check		: Check a block device metadata
-	--repair	: Repair a block device metadata
-Common options(all operations):
-	--verbose	: Verbose output
-	--vverbose	: Very verbose output
-Format options:
-	--seq <num>	: Number of sequential zones reserved for reclaim
-			  (the minimum is 1 and the default is 16).
+Operations
+  --help | -h	: General help message
+  --format	: Format a block device metadata
+  --check	: Check a block device metadata
+  --repair	: Repair a block device metadata
+  --start	: Start the device-mapper target
+  --stop	: Stop the device-mapper target
+General options
+  --verbose	: Verbose output
+  --vverbose	: Very verbose output
+Format operation options
+  --force	: Force overwrite of existing content
+  --label=<str> : Set the name to <str>
+  --seq=<num>	: Number of sequential zones reserved
+                  for reclaim. The minimum is 1 and the
+                  default is 16
 ```
 
-For a zoned block device alread formatted, the dm-zoned target can be created
-normally with the dmsetup utility (see example script below).
-
-The following options can be passed to dmsetup to initialize the target.
-
-Option        | Description
---------------|-------------------------------------------------
-rlow=int      | Start reclaiming random zones if the percentage of free random data zones falls below the specified percentage.
-idle_rlow=int | When the disk is idle (no I/O activity), start reclaiming random zones if the percentage of free random data zones falls below the specified percentage.
-
-
-## V. Example Setup Scripts
+For a zoned block device alread formatted, the *dm-zoned* target device can be
+created by executing the following command.
 
 ```
-#!/bin/sh
-
-if [ $# -lt 1 ]; then
-	echo "Usage: $0 <Zoned device path> [Options]"
-	echo "Options:"
-	echo "  rlow=<perc>      : Start reclaiming random zones if the "
-	echo "                     percentage of free random data zones falls "
-	echo "                     below <perc>."
-	echo "  idle_rlow=<perc> : When the disk is idle (no I/O activity), "
-	echo "                     start reclaiming random zones if the "
-	echo "                     percentage of free random data zones falls "
-	echo "                     below <perc>."
-	exit 1
-fi
-
-dev="${1}"
-shift
-options="$@"
-
-modprobe dm-zoned
-
-echo "0 `blockdev --getsize ${dev}` zoned ${dev} ${options}" | \
-dmsetup create zoned-`basename ${dev}`
+> dmzadm --start /dev/sdxx
 ```
+
+Conversely, a *dm-zoned* target device can be disabled using the *--stop*
+option.
+
+```
+> dmzadm --stop /dev/sdxx
+```
+
+Regular block devices such as SSDs can also be used together with zoned block
+devices with *dm-zoned*. In this case, conventional zones are emulated for the
+regular block device to hold *dm-zoned* metadata and for buffering data. When a
+regular block device is used, the zone reclaim process operates by copying data
+from emulaed conventional zones on the regular block device to zones of the
+zoned block device. This dual-drive configuration can significantly increase
+performance of the target device under write-intensive workloads.
+
+To format and start a *dm-zoned* target device using an additional regular block
+device, the following commands can be used.
+```
+> dmzadm --format /dev/nvmeXnY /dev/sdZZ
+> dmzadm --start /dev/nvmeXnY /dev/sdZZ
+```
+
+Where `/dev/nvmeXnY` is in this example a NVMe SSD block device.
 
 ## VI. Submitting patches
 
-Read CONTRIBUTING and send patches to:
+Read the [CONTRIBUTING] file and send patches to:
 
 	Damien Le Moal <damien.lemoal@wdc.com>
 	Matias Bjørling <matias.bjorling@wdc.com>
 
-If you believe this requires kernel eyes or review Cc the device mapper kernel
-development mailing list:
+If you believe your changes require kernel eyes or review, also Cc the device
+mapper kernel development mailing list at:
 
 	dm-devel@redhat.com
