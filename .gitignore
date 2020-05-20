@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Copyright (c) 2020 Western Digital Corporation or its affiliates.
+
 # Object files
 *.o
 *.lo
@@ -24,8 +28,6 @@
 *.i*86
 *.x86_64
 *.hex
-
-src/dmzadm
 src/dmzadm
 
 # Kernel compile files
@@ -37,11 +39,9 @@ modules.order
 .depfile
 .depend
 
-# Windows-specific files
+# Windows and Mac specific files
 Thumbs.db
 desktop.ini
-
-# Mac-specific things (thanks to Michael Aaron Safyan)
 .DS_Store
 
 # Editors temporary files

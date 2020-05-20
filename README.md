@@ -41,16 +41,32 @@ device capacity, zone size, etc.
 
 ### I.3. License
 
-dm-zoned-tools is distributed under the terms of the the terms of the GNU
-General Public License version 3, or any later version. A copy of version 3 of
-this license can be found in the COPYING.GPL file.
+The *dm-zoned-tools* project source code is distributed under the terms of the
+GNU General Public License v3.0 or later
+([GPL-v3](https://opensource.org/licenses/GPL-3.0)).
+A copy of this license with *dm-zoned-tools* copyright can be found in the files
+[LICENSES/GPL-3.0-or-later.txt] and [COPYING.GPL].
 
-dm-zoned-tools and all its applications are distributed "as is", without
+*dm-zoned-tools* and all its applications are distributed "as is", without
 technical support, and WITHOUT ANY WARRANTY, without even the implied warranty
 of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-Along with dm-zoned-tools, you should have received a copy of the GNU 
-General Public License version 3. If not, see <http://www.gnu.org/licenses/>.
+All source files in *dm-zoned-tools* contain the GPL-3.0-or-later license SPDX
+short identifier in place of the full license text.
+
+```
+SPDX-License-Identifier: GPL-3.0-or-later
+```
+
+Some files such as the `Makefile.am` files and the `.gitignore` file are public
+domain specified by the CC0 1.0 Universal (CC0 1.0) Public Domain Dedication.
+These files are identified with the following SPDX header.
+
+```
+SPDX-License-Identifier: CC0-1.0
+```
+
+See [LICENSES/CC0-1.0.txt] for the full text of this license.
 
 ### I.4. Contact and Bug Reports
 

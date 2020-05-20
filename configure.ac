@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Copyright (C) 2019 Western Digital Corporation or its affiliates.
+
 AC_INIT([dm-zoned tools], [1.1.0], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)

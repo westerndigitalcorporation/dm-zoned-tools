@@ -1,18 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * This file is part of dm-zoned tools.
- *
  * Copyright (C) 2016, Western Digital.  All rights reserved.
- *
- * This software is distributed under the terms of the BSD 2-clause license,
- * "as is," without technical support, and WITHOUT ANY WARRANTY, without
- * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- * PURPOSE. You should have received a copy of the BSD 2-clause license along
- * with dm-zoned tools.
- * If not, see <http://opensource.org/licenses/BSD-2-Clause>.
+ * Copyright (c) 2020 Western Digital Corporation or its affiliates.
  *
  * Authors: Damien Le Moal (damien.lemoal@wdc.com)
  */
-
 #include "dmz.h"
 
 #include <stdio.h>
@@ -56,8 +49,7 @@ struct dmz_block_dev *dmz_zone_to_bdev(struct dmz_dev *dev,
 /*
  * Reset a zone.
  */
-int dmz_reset_zone(struct dmz_dev *dev,
-		   struct blk_zone *zone)
+int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone)
 {
 	struct dmz_block_dev *bdev = dmz_zone_to_bdev(dev, zone);
 	struct blk_zone_range range;
