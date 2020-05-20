@@ -310,6 +310,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			bdev = &dev->bdev[1];
 			bdev_sector = sector - sector_offset;
 		}
+
 		if (bdev->type == DMZ_TYPE_REGULAR) {
 			__u64 zone_len = dev->zone_nr_sectors;
 
@@ -326,6 +327,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			sector += dev->zone_nr_sectors;
 			continue;
 		}
+
 		/* Get zone information */
 		memset(rep, 0, DMZ_REPORT_ZONES_BUFSZ);
 		rep->sector = bdev_sector;

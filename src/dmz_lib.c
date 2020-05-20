@@ -41,14 +41,26 @@ __u32 dmz_crc32(__u32 crc, const void *buf, size_t length)
 	return crc;
 }
 
+struct dmz_block_dev *dmz_zone_to_bdev(struct dmz_dev *dev,
+				       struct blk_zone *zone)
+{
+	if (!dev->bdev[1].name)
+		return &dev->bdev[0];
+
+	if (dmz_zone_sector(zone) < dmz_blk2sect(dev->bdev[1].block_offset))
+		return &dev->bdev[0];
+
+	return &dev->bdev[1];
+}
+
 /*
  * Reset a zone.
  */
 int dmz_reset_zone(struct dmz_dev *dev,
 		   struct blk_zone *zone)
 {
+	struct dmz_block_dev *bdev = dmz_zone_to_bdev(dev, zone);
 	struct blk_zone_range range;
-	struct dmz_block_dev *bdev = &dev->bdev[1];
 
 	if (dmz_zone_unknown(zone) ||
 	    dmz_zone_conv(zone) ||
@@ -56,8 +68,7 @@ int dmz_reset_zone(struct dmz_dev *dev,
 		return 0;
 
 	/* Non empty sequential zone: reset */
-	range.sector = dmz_zone_sector(zone) -
-		dmz_blk2sect(dev->bdev[1].block_offset);
+	range.sector = dmz_zone_sector(zone) - dmz_blk2sect(bdev->block_offset);
 	range.nr_sectors = dmz_zone_length(zone);
 	if (ioctl(bdev->fd, BLKRESETZONE, &range) < 0) {
 		fprintf(stderr,
