@@ -1,18 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * This file is part of dm-zoned tools.
- *
  * Copyright (C) 2020, SUSE Linux. All rights reserved.
- *
- * This software is distributed under the terms of the BSD 2-clause license,
- * "as is," without technical support, and WITHOUT ANY WARRANTY, without
- * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- * PURPOSE. You should have received a copy of the BSD 2-clause license along
- * with dm-zoned tools.
- * If not, see <http://opensource.org/licenses/BSD-2-Clause>.
  *
  * Authors: Hannes Reinecke (hare@suse.com)
  */
-
 #include "dmz.h"
 
 #include <stdio.h>

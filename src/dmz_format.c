@@ -1,18 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * This file is part of dm-zoned tools.
- *
  * Copyright (C) 2016, Western Digital.  All rights reserved.
- *
- * This software is distributed under the terms of the BSD 2-clause license,
- * "as is," without technical support, and WITHOUT ANY WARRANTY, without
- * even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- * PURPOSE. You should have received a copy of the BSD 2-clause license along
- * with dm-zoned tools.
- * If not, see <http://opensource.org/licenses/BSD-2-Clause>.
+ * Copyright (c) 2020 Western Digital Corporation or its affiliates.
  *
  * Authors: Damien Le Moal (damien.lemoal@wdc.com)
  */
-
 #include "dmz.h"
 
 #include <stdio.h>
@@ -28,8 +21,7 @@
 /*
  * Fill and write a super block.
  */
-int dmz_write_super(struct dmz_dev *dev,
-		    __u64 gen, __u64 offset)
+int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
 {
 	__u64 sb_block = dev->sb_block + offset, bdev_sb_block;
 	struct dm_zoned_super *sb;
@@ -93,8 +85,7 @@ int dmz_write_super(struct dmz_dev *dev,
 /*
  * Write mapping table blocks.
  */
-static int dmz_write_mapping(struct dmz_dev *dev,
-			     __u64 offset)
+static int dmz_write_mapping(struct dmz_dev *dev, __u64 offset)
 {
 	__u64 map_block;
 	struct dm_zoned_map *dmap;
@@ -138,8 +129,7 @@ static int dmz_write_mapping(struct dmz_dev *dev,
 /*
  * Write zone bitmap blocks.
  */
-static int dmz_write_bitmap(struct dmz_dev *dev,
-			    __u64 offset)
+static int dmz_write_bitmap(struct dmz_dev *dev, __u64 offset)
 {
 	__u64 bitmap_block;
 	unsigned int i;
@@ -176,8 +166,7 @@ static int dmz_write_bitmap(struct dmz_dev *dev,
 /*
  * Write formatted metadata blocks.
  */
-static int dmz_write_meta(struct dmz_dev *dev,
-			  __u64 offset)
+static int dmz_write_meta(struct dmz_dev *dev, __u64 offset)
 {
 
 	/* Write mapping table */
