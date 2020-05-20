@@ -315,12 +315,10 @@ static inline bool dmz_zone_is_cache(struct dmz_dev *dev, struct blk_zone *zone)
 {
 	if (dev->bdev[1].name)
 		return dmz_zone_unknown(zone);
-	else
-		return dmz_zone_rnd(zone);
+	return dmz_zone_rnd(zone);
 }
 
-static inline const char *
-dmz_zone_type_str(struct blk_zone *zone)
+static inline const char *dmz_zone_type_str(struct blk_zone *zone)
 {
 	switch (dmz_zone_type(zone)) {
 	case BLK_ZONE_TYPE_CONVENTIONAL:
@@ -335,8 +333,7 @@ dmz_zone_type_str(struct blk_zone *zone)
 
 #define dmz_zone_cond(z)	(z)->cond
 
-static inline const char *
-dmz_zone_cond_str(struct blk_zone *zone)
+static inline const char *dmz_zone_cond_str(struct blk_zone *zone)
 {
 	switch (dmz_zone_cond(zone)) {
 	case BLK_ZONE_COND_NOT_WP:
@@ -374,6 +371,8 @@ extern void dmz_close_dev(struct dmz_block_dev *dev);
 extern int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
 extern int dmz_sync_dev(struct dmz_block_dev *dev);
 extern int dmz_get_dev_zones(struct dmz_dev *dev);
+extern struct dmz_block_dev *dmz_zone_to_bdev(struct dmz_dev *dev,
+					      struct blk_zone *zone);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
 extern int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
