@@ -184,7 +184,8 @@ struct dmz_block_dev {
 	size_t		zone_nr_sectors;
 	size_t		zone_nr_blocks;
 
-	/* Device file descriptor */
+	int		nr_zones;
+
 	int		fd;
 };
 
