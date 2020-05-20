@@ -238,8 +238,6 @@ int main(int argc, char **argv)
 	dev.capacity = dev.bdev[0].capacity;
 
 	if (dev.bdev[1].path) {
-		__u64 nr_zones;
-
 		if (dmz_open_dev(&dev.bdev[1], op, dev.flags) < 0)
 			return 1;
 		if (!dmz_bdev_is_zoned(&dev.bdev[1])) {
@@ -255,10 +253,12 @@ int main(int argc, char **argv)
 		dev.zone_nr_blocks = dev.bdev[1].zone_nr_blocks;
 		dev.bdev[0].zone_nr_sectors = dev.zone_nr_sectors;
 		dev.bdev[0].zone_nr_blocks = dev.zone_nr_blocks;
-		nr_zones = dev.bdev[0].capacity / dev.zone_nr_sectors;
+		dev.bdev[0].nr_zones =
+			dev.bdev[0].capacity / dev.zone_nr_sectors;
 		if (dev.bdev[0].capacity % dev.zone_nr_sectors)
-			nr_zones++;
-		dev.bdev[1].block_offset = nr_zones * dev.zone_nr_blocks;
+			dev.bdev[0].nr_zones++;
+		dev.bdev[1].block_offset =
+			dev.bdev[0].nr_zones * dev.zone_nr_blocks;
 	}
 
 	if (dmz_get_dev_zones(&dev) < 0)

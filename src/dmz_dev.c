@@ -201,6 +201,29 @@ static int dmz_get_dev_capacity(struct dmz_block_dev *dev)
 	}
 	dev->zone_nr_blocks = dmz_sect2blk(dev->zone_nr_sectors);
 
+	/* Get number of zones */
+	snprintf(str, sizeof(str),
+		 "/sys/block/%s/queue/nr_zones",
+		 dev->name);
+	file = fopen(str, "r");
+	if (!file) {
+		fprintf(stderr, "Open %s failed\n", str);
+		return -1;
+	}
+
+	memset(str, 0, sizeof(str));
+	res = fscanf(file, "%s", str);
+	fclose(file);
+
+	if (res != 1) {
+		fprintf(stderr, "Invalid file %s format\n", str);
+		return -1;
+	}
+	dev->nr_zones = atol(str);
+	if (!dev->nr_zones) {
+		fprintf(stderr, "%s: invalid number of zones\n", dev->path);
+		return -1;
+	}
 	return 0;
 }
 
@@ -264,13 +287,12 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 	__u64 sector;
 	int ret = -1;
 
-	/* This will ignore an eventual last smaller zone */
-	nr_zones = dev->capacity / dev->zone_nr_sectors;
-	if (dev->capacity % dev->zone_nr_sectors)
-		nr_zones++;
+	dev->nr_zones = dev->bdev[0].nr_zones;
+	if (dev->bdev[1].name)
+		dev->nr_zones += dev->bdev[1].nr_zones;
 
 	/* Allocate zone array */
-	dev->zones = calloc(nr_zones, sizeof(struct blk_zone));
+	dev->zones = calloc(dev->nr_zones, sizeof(struct blk_zone));
 	if (!dev->zones) {
 		fprintf(stderr, "Not enough memory\n");
 		return -1;
@@ -287,6 +309,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 		/ sizeof(struct blk_zone);
 
 	sector = 0;
+	nr_zones = 0;
 	while (sector < dev->capacity) {
 		__u64 sector_offset = dmz_blk2sect(dev->bdev[1].block_offset);
 		__u64 bdev_sector;
@@ -306,7 +329,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			__u64 zone_len = dev->zone_nr_sectors;
 
 			/* Emulate zone information */
-			blkz = &dev->zones[dev->nr_zones];
+			blkz = &dev->zones[nr_zones];
 			blkz->start = sector;
 			if (blkz->start + zone_len > bdev->capacity)
 				zone_len = bdev->capacity - blkz->start;
@@ -314,7 +337,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			blkz->wp = (__u64)-1;
 			blkz->type = BLK_ZONE_TYPE_UNKNOWN;
 			blkz->cond = BLK_ZONE_COND_NOT_WP;
-			dev->nr_zones++;
+			nr_zones++;
 			sector += dev->zone_nr_sectors;
 			continue;
 		}
@@ -353,12 +376,11 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 
 			blkz->start += sector_offset;
 			blkz->wp += sector_offset;
-			dev->zones[dev->nr_zones] = *blkz;
-			dev->nr_zones++;
+			dev->zones[nr_zones] = *blkz;
+			nr_zones++;
 
 			sector = dmz_zone_sector(blkz) + dmz_zone_length(blkz);
 			blkz++;
-
 		}
 
 	}
@@ -367,7 +389,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 		fprintf(stderr,
 			"%s: Invalid number of zones (expected %u, got %u)\n",
 			dev->label,
-			nr_zones, dev->nr_zones);
+			dev->nr_zones, nr_zones);
 		ret = -1;
 		goto out;
 	}
