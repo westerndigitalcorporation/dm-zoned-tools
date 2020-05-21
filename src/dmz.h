@@ -30,7 +30,7 @@
 /*
  * DM target version
  */
-#define DMZ_DM_VER	2
+#define DMZ_DM_VER	3
 
 /*
  * On-disk super block magic.
@@ -189,7 +189,7 @@ struct dmz_block_dev {
 	size_t		zone_nr_sectors;
 	size_t		zone_nr_blocks;
 
-	int		nr_zones;
+	unsigned int	nr_zones;
 
 	int		fd;
 };
@@ -200,7 +200,8 @@ struct dmz_block_dev {
 struct dmz_dev {
 
 	/* Device block devices */
-	struct dmz_block_dev bdev[2];
+	struct dmz_block_dev *bdev;
+	int		nr_bdev;
 	int		op;
 	unsigned int	flags;
 	char		label[32];
@@ -308,7 +309,7 @@ static inline void dmz_clear_bit(__u8 *bitmap,
 
 static inline bool dmz_zone_is_cache(struct dmz_dev *dev, struct blk_zone *zone)
 {
-	if (dev->bdev[1].name)
+	if (dev->nr_bdev > 1)
 		return dmz_zone_unknown(zone);
 	return dmz_zone_rnd(zone);
 }
@@ -361,13 +362,15 @@ static inline const char *dmz_zone_cond_str(struct blk_zone *zone)
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
 extern unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block);
+extern struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
+					       __u64 block, __u64 *ret_block);
+extern struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
+						__u64 sector, __u64 *ret_sector);
 extern int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
 extern void dmz_close_dev(struct dmz_block_dev *dev);
 extern int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
 extern int dmz_sync_dev(struct dmz_block_dev *dev);
 extern int dmz_get_dev_zones(struct dmz_dev *dev);
-extern struct dmz_block_dev *dmz_zone_to_bdev(struct dmz_dev *dev,
-					      struct blk_zone *zone);
 extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 extern int dmz_reset_zones(struct dmz_dev *dev);
 extern int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);

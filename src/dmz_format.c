@@ -25,7 +25,7 @@ int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
 {
 	__u64 sb_block = dev->sb_block + offset, bdev_sb_block;
 	struct dm_zoned_super *sb;
-	struct dmz_block_dev *bdev = &dev->bdev[0];
+	struct dmz_block_dev *bdev;
 	__u32 crc;
 	__u8 *buf;
 	int ret;
@@ -37,13 +37,7 @@ int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
 	}
 	memset(buf, 0, DMZ_BLOCK_SIZE);
 
-	bdev_sb_block = sb_block;
-	if (dev->bdev[1].name) {
-		if (sb_block >= dev->bdev[1].block_offset) {
-			bdev_sb_block -= dev->bdev[1].block_offset;
-			bdev = &dev->bdev[1];
-		}
-	}
+	bdev = dmz_block_to_bdev(dev, sb_block, &bdev_sb_block);
 
 	printf("  Writing super block to %s block %llu\n",
 	       bdev->name, bdev_sb_block);
@@ -189,6 +183,8 @@ static int dmz_write_meta(struct dmz_dev *dev, __u64 offset)
  */
 int dmz_format(struct dmz_dev *dev)
 {
+	int i;
+
 	if (dev->sb_version > DMZ_META_VER) {
 		dev->sb_version = DMZ_META_VER;
 		fprintf(stderr, "Falling back to metadata version %d\n",
@@ -206,32 +202,29 @@ int dmz_format(struct dmz_dev *dev)
 		return -1;
 
 	if (dev->sb_version > 1) {
+		int i;
+
 		if (uuid_is_null(dev->uuid))
 			uuid_generate_random(dev->uuid);
-		if (uuid_is_null(dev->bdev[0].uuid))
-			uuid_generate_random(dev->bdev[0].uuid);
-		if (dev->bdev[1].name && uuid_is_null(dev->bdev[1].uuid))
-			uuid_generate_random(dev->bdev[1].uuid);
+		for (i = 0; i < dev->nr_bdev; i++) {
+			if (uuid_is_null(dev->bdev[i].uuid))
+				uuid_generate_random(dev->bdev[i].uuid);
+		}
 	}
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_data_zones;
 
 		printf("Format metadata %d:\n", dev->sb_version);
 		if (dev->sb_version > 1) {
-			struct dmz_block_dev *bdev = &dev->bdev[0];
 			char dev_uuid[UUID_STR_LEN];
-			char bdev_uuid[UUID_STR_LEN];
 
 			uuid_unparse(dev->uuid, dev_uuid);
-			uuid_unparse(bdev->uuid, bdev_uuid);
 			printf("  DM-Zoned UUID %s\n", dev_uuid);
 			printf("  DM-Zoned Label %s\n", dev->label);
-			printf("  Device %s UUID %s\n",
-			       bdev->name, bdev_uuid);
-			if (dev->bdev[1].name) {
-				printf("  Device %s block offset %llu\n",
-				       bdev->name, bdev->block_offset);
-				bdev = &dev->bdev[1];
+			for (i = 0; i < dev->nr_bdev; i++) {
+				struct dmz_block_dev *bdev = &dev->bdev[i];
+				char bdev_uuid[UUID_STR_LEN];
+
 				uuid_unparse(bdev->uuid, bdev_uuid);
 				printf("  Device %s UUID %s\n",
 				       bdev->name, bdev_uuid);
@@ -290,17 +283,18 @@ int dmz_format(struct dmz_dev *dev)
 			   dev->zone_nr_blocks * dev->nr_meta_zones) < 0)
 		return -1;
 
-	if (dev->sb_version > 1 && dev->bdev[1].name) {
+	if (dev->sb_version > 1 && dev->nr_bdev > 1) {
 		printf("Writing tertiary metadata\n");
-		if (dmz_write_super(dev, 0, dev->bdev[1].block_offset) < 0)
-			return -1;
+		for (i = 1; i < dev->nr_bdev; i++) {
+			if (dmz_write_super(dev, 0,
+					    dev->bdev[i].block_offset) < 0)
+				return -1;
+		}
 	}
 
 	/* Sync */
-	if (dmz_sync_dev(&dev->bdev[0]) < 0)
-		return -1;
-	if (dev->bdev[1].name) {
-		if (dmz_sync_dev(&dev->bdev[1]) < 0)
+	for (i = 0; i < dev->nr_bdev; i++) {
+		if (dmz_sync_dev(&dev->bdev[i]) < 0)
 			return -1;
 	}
 

@@ -49,6 +49,9 @@ int dmz_init_dm(int log_level)
 			ret = 0;
 			switch (tgt->version[0]) {
 			case DMZ_DM_VER:
+				/* Interface v3 uses v2 metadata */
+				/* fall through */
+			case 2:
 				ret = DMZ_META_VER;
 				break;
 			case 1:
@@ -94,9 +97,15 @@ int dmz_create_dm(struct dmz_dev *dev)
 	if (!dm_task_set_name (dmt, dev->label))
 		goto out;
 
-	if (dev->sb_version > 1 && dev->bdev[1].path)
-		sprintf(params, "%s %s", dev->bdev[0].path, dev->bdev[1].path);
-	else
+	if (dev->sb_version > 1 && dev->nr_bdev > 1) {
+		int i;
+		unsigned len = 0;
+
+		for (i = 0; i < dev->nr_bdev; i++) {
+			len += snprintf(params + len, 4096 - len,
+					"%s ", dev->bdev[i].path);
+		}
+	} else
 		sprintf(params, "%s", dev->bdev[0].path);
 
 	if (!dm_task_add_target(dmt, 0, capacity, "zoned", params))

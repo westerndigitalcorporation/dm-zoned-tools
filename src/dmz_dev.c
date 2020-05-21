@@ -32,15 +32,39 @@
 struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 					__u64 block, __u64 *ret_block)
 {
+	int i;
+
 	*ret_block = block;
-	if (!dev->bdev[1].name)
-		return &dev->bdev[0];
 
-	if (block < dev->bdev[1].block_offset)
-		return &dev->bdev[0];
+	for (i = dev->nr_bdev - 1; i >= 0; i--) {
+		if (block >= dev->bdev[i].block_offset) {
+			*ret_block -= dev->bdev[i].block_offset;
+			return &dev->bdev[i];
+		}
+	}
 
-	*ret_block -= dev->bdev[1].block_offset;
-	return &dev->bdev[1];
+	return &dev->bdev[0];
+}
+
+/*
+ * Translate device to sector
+ */
+struct dmz_block_dev *
+dmz_sector_to_bdev(struct dmz_dev *dev, __u64 sector, __u64 *ret_sector)
+{
+	int i;
+
+	*ret_sector = sector;
+
+	for (i = dev->nr_bdev - 1; i >= 0; i--) {
+		__u64 sector_offset =
+			dmz_blk2sect(dev->bdev[i].block_offset);
+		if (sector >= sector_offset) {
+			*ret_sector = sector - sector_offset;
+			return &dev->bdev[i];
+		}
+	}
+	return &dev->bdev[0];
 }
 
 unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block)
@@ -230,27 +254,29 @@ static int dmz_get_dev_capacity(struct dmz_block_dev *dev)
 /*
  * Print a device zone information.
  */
-static void dmz_print_zone(struct dmz_dev *dev, struct blk_zone *zone)
+static void dmz_print_zone(struct dmz_dev *dev,
+			   struct dmz_block_dev *bdev,
+			   struct blk_zone *zone)
 {
 
 	if (dmz_zone_cond(zone) == BLK_ZONE_COND_READONLY) {
-		printf("Zone %05u: readonly %s zone\n",
-		       dmz_zone_id(dev, zone),
+		printf("Zone %06u (%s): readonly %s zone\n",
+		       dmz_zone_id(dev, zone), bdev->name,
 		       dmz_zone_cond_str(zone));
 		return;
 	}
 
 	if (dmz_zone_cond(zone) == BLK_ZONE_COND_OFFLINE) {
-		printf("Zone %05u: offline %s zone\n",
-		       dmz_zone_id(dev, zone),
+		printf("Zone %06u (%s): offline %s zone\n",
+		       dmz_zone_id(dev, zone), bdev->name,
 		       dmz_zone_cond_str(zone));
 		return;
 	}
 
 	if (dmz_zone_conv(zone)) {
-		printf("Zone %05u: Conventional, cond 0x%x (%s), "
+		printf("Zone %06u (%s): Conventional, cond 0x%x (%s), "
 		       "sector %llu, %llu sectors\n",
-		       dmz_zone_id(dev, zone),
+		       dmz_zone_id(dev, zone), bdev->name,
 		       dmz_zone_cond(zone),
 		       dmz_zone_cond_str(zone),
 		       dmz_zone_sector(zone),
@@ -258,9 +284,9 @@ static void dmz_print_zone(struct dmz_dev *dev, struct blk_zone *zone)
 		return;
 	}
 
-	printf("Zone %05u: type 0x%x (%s), cond 0x%x (%s), need_reset %d, "
+	printf("Zone %06u (%s): type 0x%x (%s), cond 0x%x (%s), need_reset %d, "
 	       "non_seq %d, sector %llu, %llu sectors, wp sector %llu\n",
-	       dmz_zone_id(dev, zone),
+	       dmz_zone_id(dev, zone), bdev->name,
 	       dmz_zone_type(zone),
 	       dmz_zone_type_str(zone),
 	       dmz_zone_cond(zone),
@@ -279,17 +305,16 @@ static void dmz_print_zone(struct dmz_dev *dev, struct blk_zone *zone)
  */
 int dmz_get_dev_zones(struct dmz_dev *dev)
 {
-	struct dmz_block_dev *bdev;
 	struct blk_zone_report *rep = NULL;
 	unsigned int rep_max_zones;
 	struct blk_zone *blkz;
 	unsigned int i, nr_zones;
 	__u64 sector;
-	int ret = -1;
+	int ret = -1, d;
 
-	dev->nr_zones = dev->bdev[0].nr_zones;
-	if (dev->bdev[1].name)
-		dev->nr_zones += dev->bdev[1].nr_zones;
+	dev->nr_zones = 0;
+	for (d = 0; d < dev->nr_bdev; d++)
+		dev->nr_zones += dev->bdev[d].nr_zones;
 
 	/* Allocate zone array */
 	dev->zones = calloc(dev->nr_zones, sizeof(struct blk_zone));
@@ -311,20 +336,10 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 	sector = 0;
 	nr_zones = 0;
 	while (sector < dev->capacity) {
-		__u64 sector_offset = dmz_blk2sect(dev->bdev[1].block_offset);
-		__u64 bdev_sector;
+		__u64 sector_offset, bdev_sector;
+		struct dmz_block_dev *bdev;
 
-		if (!dev->bdev[1].name) {
-			bdev = &dev->bdev[0];
-			bdev_sector = sector;
-		} else if (sector < sector_offset) {
-			bdev = &dev->bdev[0];
-			bdev_sector = sector;
-		} else {
-			bdev = &dev->bdev[1];
-			bdev_sector = sector - sector_offset;
-		}
-
+		bdev = dmz_sector_to_bdev(dev, sector, &bdev_sector);
 		if (bdev->type == DMZ_TYPE_REGULAR) {
 			__u64 zone_len = dev->zone_nr_sectors;
 
@@ -337,15 +352,22 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			blkz->wp = (__u64)-1;
 			blkz->type = BLK_ZONE_TYPE_UNKNOWN;
 			blkz->cond = BLK_ZONE_COND_NOT_WP;
+			if (dev->flags & DMZ_VVERBOSE)
+				dmz_print_zone(dev, bdev, blkz);
 			nr_zones++;
 			sector += dev->zone_nr_sectors;
 			continue;
 		}
 
 		/* Get zone information */
+		sector_offset = dmz_blk2sect(bdev->block_offset);
 		memset(rep, 0, DMZ_REPORT_ZONES_BUFSZ);
 		rep->sector = bdev_sector;
 		rep->nr_zones = rep_max_zones;
+		if (dev->flags & DMZ_VVERBOSE)
+			printf("%s: report zones sector %llu(%llu) zones %u start %u\n",
+			       bdev->name, rep->sector, sector, rep->nr_zones,
+			       nr_zones);
 		ret = ioctl(bdev->fd, BLKREPORTZONE, rep);
 		if (ret != 0) {
 			fprintf(stderr,
@@ -358,14 +380,11 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 			break;
 
 		blkz = (struct blk_zone *)(rep + 1);
-		for (i = 0; i < rep->nr_zones && sector < dev->capacity; i++) {
-
-			if (dev->flags & DMZ_VVERBOSE)
-				dmz_print_zone(dev, blkz);
+		for (i = 0; i < rep->nr_zones; i++) {
 
 			/* Check zone size */
 			if (dmz_zone_length(blkz) != dev->zone_nr_sectors &&
-			    dmz_zone_sector(blkz) + dmz_zone_length(blkz) != dev->capacity) {
+			    dmz_zone_sector(blkz) + dmz_zone_length(blkz) != bdev->capacity) {
 				fprintf(stderr,
 					"%s: Invalid zone %u size\n",
 					bdev->name,
@@ -374,8 +393,18 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 				goto out;
 			}
 
+			if (nr_zones >= dev->nr_zones) {
+				fprintf(stderr,
+					"%s: Invalid zone %u start %llu\n",
+					bdev->name, nr_zones, blkz->start);
+				ret = -1;
+				goto out;
+			}
 			blkz->start += sector_offset;
 			blkz->wp += sector_offset;
+			if (dev->flags & DMZ_VVERBOSE)
+				dmz_print_zone(dev, bdev, blkz);
+
 			dev->zones[nr_zones] = *blkz;
 			nr_zones++;
 
@@ -394,7 +423,7 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 		goto out;
 	}
 
-	if (sector != dev->nr_zones * dev->zone_nr_sectors) {
+	if (sector != nr_zones * dev->zone_nr_sectors) {
 		fprintf(stderr,
 			"%s: Invalid zones (last sector reported is %llu, "
 			"expected %llu)\n",
