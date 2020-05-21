@@ -817,8 +817,12 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 				goto err;
 			}
 		} else {
-			bdev = &dev->bdev[1];
-			uuid_copy(bdev->uuid, sb->dev_uuid);
+			int i;
+
+			for (i = 1; i < dev->nr_bdev; i++) {
+				bdev = &dev->bdev[i];
+				uuid_copy(bdev->uuid, sb->dev_uuid);
+			}
 		}
 	}
 	/* Check location */
@@ -1022,23 +1026,31 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 	if (ret != 0)
 		return -1;
 
-	if (dev->bdev[1].name) {
-		mset[2].sb_block = dev->bdev[1].block_offset;
-		dmz_msg(dev, ind,
-			"Tertiary superblock at block %llu (zone %u)\n",
-			mset[2].sb_block,
-			dmz_block_zone_id(dev, mset[2].sb_block));
-		ret = dmz_check_sb(dev, &mset[2]);
-		if (ret != 0) {
-			mset[2].flags = 0;
-			return -1;
-		}
-	}
 	if (mset[1].flags & DMZ_MSET_SB_VALID &&
 	    !(mset[0].flags & DMZ_MSET_SB_VALID))
 		dmz_check_print_format(dev, ind + 2);
 
 	return 0;
+}
+
+static int dmz_check_tertiary_superblocks(struct dmz_dev *dev)
+{
+	int i, ret;
+
+	for (i = 1; i < dev->nr_bdev; i++) {
+		struct dmz_meta_set mset;
+
+		memset(&mset, 0, sizeof(mset));
+		mset.id = i;
+		mset.sb_block = dev->bdev[i].block_offset;
+		dmz_msg(dev, 2,
+			"Tertiary superblock at block %llu (zone %u)\n",
+			mset.sb_block, dmz_block_zone_id(dev, mset.sb_block));
+		ret = dmz_check_sb(dev, &mset);
+		if (ret)
+			break;
+	}
+	return ret;
 }
 
 /*
@@ -1182,6 +1194,9 @@ int dmz_check(struct dmz_dev *dev)
 
 	}
 
+	if (dmz_check_tertiary_superblocks(dev))
+		mset[2].flags = 0;
+
 	if (mset[0].flags == DMZ_MSET_VALID &&
 	    mset[1].flags == DMZ_MSET_VALID &&
 	    mset[2].flags == DMZ_MSET_VALID)
@@ -1248,7 +1263,7 @@ int dmz_repair(struct dmz_dev *dev)
 {
 	struct dmz_meta_set mset[3];
 	struct dmz_meta_set *check_mset = NULL;
-	int id, ret;
+	int id, ret, i;
 
 	/* Init */
 	memset(mset, 0, sizeof(struct dmz_meta_set) * 3);
@@ -1309,10 +1324,8 @@ int dmz_repair(struct dmz_dev *dev)
 	}
 
 	/* Sync device */
-	if (dmz_sync_dev(&dev->bdev[0]) < 0)
-		return -1;
-	if (dev->bdev[1].name) {
-		if (dmz_sync_dev(&dev->bdev[1]) < 0)
+	for (i = 0; i < dev->nr_bdev; i++) {
+		if (dmz_sync_dev(&dev->bdev[i]) < 0)
 			return -1;
 	}
 
