@@ -28,6 +28,11 @@
 #define DMZ_META_VER	2
 
 /*
+ * DM target version
+ */
+#define DMZ_DM_VER	2
+
+/*
  * On-disk super block magic.
  */
 #define DMZ_MAGIC	((((unsigned int)('D')) << 24) | \

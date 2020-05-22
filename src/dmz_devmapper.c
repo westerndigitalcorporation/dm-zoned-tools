@@ -47,14 +47,21 @@ int dmz_init_dm(int log_level)
 				       tgt->version[0], tgt->version[1],
 				       tgt->version[2]);
 			ret = 0;
-			if (tgt->version[0] <= DMZ_META_VER) {
+			switch (tgt->version[0]) {
+			case DMZ_DM_VER:
+				ret = DMZ_META_VER;
+				break;
+			case 1:
 				ret = tgt->version[0];
 				break;
+			default:
+				fprintf(stderr,
+					"Unsupported dm-zoned version %d.%d.%d\n",
+					tgt->version[0], tgt->version[1],
+					tgt->version[2]);
+				ret = -EINVAL;
+				break;
 			}
-			fprintf(stderr,
-				"Unsupported dm-zoned version %d.%d.%d\n",
-				tgt->version[0], tgt->version[1],
-				tgt->version[2]);
 		}
 		tgt = (void *) tgt + tgt->next;
 	} while (last_tgt != tgt);
