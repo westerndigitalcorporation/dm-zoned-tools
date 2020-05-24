@@ -39,6 +39,8 @@ AC_CHECK_HEADER(uuid/uuid.h, [],
 		[AC_MSG_ERROR([Couldn't find uuid/uuid.h])])
 AC_CHECK_HEADER(libdevmapper.h, [],
 		[AC_MSG_ERROR([Couldn't find libdevmapper.h])])
+AC_CHECK_HEADER(kmod/libkmod.h, [],
+		[AC_MSG_ERROR([Couldn't find libkmod.h])])
 
 # Checks for libraries.
 AC_SEARCH_LIBS([blkid_do_fullprobe], [blkid], [],
@@ -49,6 +51,9 @@ AC_SEARCH_LIBS([uuid_generate_random], [uuid], [],
 
 AC_SEARCH_LIBS([dm_task_run], [devmapper], [],
 		[AC_MSG_ERROR([Couldn't find libdevmapper])])
+
+AC_SEARCH_LIBS([kmod_module_ref], [kmod], [],
+		[AC_MSG_ERROR([Couldn't find libkmod])])
 
 AC_CONFIG_FILES([
 	Makefile

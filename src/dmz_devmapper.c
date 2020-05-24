@@ -13,9 +13,72 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
+#include <kmod/libkmod.h>
 #include <asm/byteorder.h>
 
 #include <libdevmapper.h>
+
+int dmz_load_module(const char *modname, int log_level)
+{
+	struct kmod_ctx *ctx = kmod_new(NULL, NULL);
+	struct kmod_list *modlist, *itr;
+	int state, ret;
+
+	if (!ctx)
+		return -ENOMEM;
+	kmod_load_resources(ctx);
+	ret = kmod_module_new_from_lookup(ctx, modname, &modlist);
+	if (ret < 0) {
+		(void)kmod_unref(ctx);
+		return ret;
+	}
+	if (!modlist) {
+		fprintf(stderr, "Module '%s' not present\n", modname);
+		(void)kmod_unref(ctx);
+		return -ENOENT;
+	}
+	kmod_list_foreach(itr, modlist) {
+		struct kmod_module *mod = NULL;
+
+		mod = kmod_module_get_module(itr);
+		if (!mod)
+			continue;
+		state = kmod_module_get_initstate(mod);
+		if (state == KMOD_MODULE_BUILTIN) {
+			if (log_level)
+				printf("Module '%s' built-in\n", modname);
+			(void)kmod_module_unref(mod);
+			continue;
+		}
+		if (state == KMOD_MODULE_LIVE) {
+			if (log_level)
+				printf("Module '%s' already loaded\n", modname);
+			(void)kmod_module_unref(mod);
+			continue;
+		}
+		ret = kmod_module_probe_insert_module(mod,
+			KMOD_PROBE_APPLY_BLACKLIST, NULL, NULL, NULL, NULL);
+		if (ret) {
+			if (ret == KMOD_PROBE_APPLY_BLACKLIST) {
+				fprintf(stderr,
+					"Module '%s' is blacklisted\n",
+					modname);
+				ret = -ENXIO;
+			} else {
+				fprintf(stderr,
+					"Module '%s' not loaded, error %d\n",
+					modname, ret);
+			}
+		} else if (log_level)
+			printf("Module '%s' loaded\n", modname);
+		(void)kmod_module_unref(mod);
+		if (ret)
+			break;
+	}
+	kmod_module_unref_list(modlist);
+	(void)kmod_unref(ctx);
+	return ret;
+}
 
 int dmz_init_dm(int log_level)
 {

@@ -386,5 +386,6 @@ extern int dmz_repair(struct dmz_dev *dev);
 extern int dmz_init_dm(int log_level);
 extern int dmz_start(struct dmz_dev *dev);
 extern int dmz_stop(struct dmz_dev *dev, char *dm_dev);
+extern int dmz_load_module(const char *modname, int log_level);
 
 #endif /* __DMZ_H__ */
