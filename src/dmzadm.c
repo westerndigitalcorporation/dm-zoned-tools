@@ -14,6 +14,8 @@
 #include <string.h>
 #include <errno.h>
 
+const char modname[] = "dm-zoned";
+
 /*
  * Print usage.
  */
@@ -193,6 +195,11 @@ int main(int argc, char **argv)
 		}
 
 	}
+
+	/* Load module if not present */
+	ret = dmz_load_module(modname, log_level);
+	if (ret)
+		return 1;
 
 	/* Check device-mapper target version */
 	ret = dmz_init_dm(log_level);
