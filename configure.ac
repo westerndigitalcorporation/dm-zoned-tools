@@ -39,7 +39,7 @@ AC_CHECK_HEADER(uuid/uuid.h, [],
 		[AC_MSG_ERROR([Couldn't find uuid/uuid.h])])
 AC_CHECK_HEADER(libdevmapper.h, [],
 		[AC_MSG_ERROR([Couldn't find libdevmapper.h])])
-AC_CHECK_HEADER(kmod/libkmod.h, [],
+AC_CHECK_HEADER(libkmod.h, [],
 		[AC_MSG_ERROR([Couldn't find libkmod.h])])
 
 # Checks for libraries.

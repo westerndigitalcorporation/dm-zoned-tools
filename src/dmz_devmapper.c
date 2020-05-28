@@ -13,7 +13,7 @@
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
-#include <kmod/libkmod.h>
+#include <libkmod.h>
 #include <asm/byteorder.h>
 
 #include <libdevmapper.h>
