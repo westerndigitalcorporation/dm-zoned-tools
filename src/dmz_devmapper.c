@@ -21,7 +21,7 @@
 int dmz_load_module(const char *modname, int log_level)
 {
 	struct kmod_ctx *ctx = kmod_new(NULL, NULL);
-	struct kmod_list *modlist, *itr;
+	struct kmod_list *modlist = NULL, *itr;
 	int state, ret;
 
 	if (!ctx)
