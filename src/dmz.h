@@ -352,6 +352,8 @@ static inline const char *dmz_zone_cond_str(struct blk_zone *zone)
 	return "Unknown-condition";
 }
 
+extern int dmz_mod_ver;
+
 #define dmz_zone_empty(z)	(dmz_zone_cond(z) == BLK_ZONE_COND_EMPTY)
 
 #define dmz_zone_sector(z)	(z)->start
