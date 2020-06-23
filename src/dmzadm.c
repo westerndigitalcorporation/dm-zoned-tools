@@ -14,7 +14,9 @@
 #include <string.h>
 #include <errno.h>
 
-const char modname[] = "dm-zoned";
+static const char modname[] = "dm-zoned";
+
+int dmz_mod_ver;
 
 /*
  * Print usage.
@@ -210,15 +212,17 @@ int main(int argc, char **argv)
 		return 1;
 
 	/* Check device-mapper target version */
-	ret = dmz_init_dm(log_level);
-	if (ret <= 0)
+	dmz_mod_ver = dmz_init_dm(log_level);
+	if (dmz_mod_ver <= 0)
 		return 1;
-	if (ret < (int)dev->sb_version) {
-		fprintf(stderr, "Falling back to metadata version %d\n", ret);
-		dev->sb_version = ret;
-	} else if (ret > (int)dev->sb_version) {
+
+	if (dmz_mod_ver < (int)dev->sb_version) {
+		fprintf(stderr, "Falling back to metadata version %d\n",
+			dmz_mod_ver);
+		dev->sb_version = dmz_mod_ver;
+	} else if (dmz_mod_ver > (int)dev->sb_version) {
 		printf("Defaulting to metadata version %d from version %d\n",
-		       dev->sb_version, ret);
+		       dev->sb_version, dmz_mod_ver);
 	}
 	if (op == DMZ_OP_STOP) {
 		char holder[PATH_MAX];
