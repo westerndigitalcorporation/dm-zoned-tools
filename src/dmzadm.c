@@ -21,7 +21,8 @@ const char modname[] = "dm-zoned";
  */
 static void dmzadm_usage(void)
 {
-	printf("Usage: dmzadm <operation> <device path> [options]\n");
+	printf("Usage: dmzadm <operation> <device(s)> [options]\n");
+
 	printf("Operations\n"
 	       "  --help | -h	: General help message\n"
 	       "  --format	: Format a block device metadata\n"
@@ -30,13 +31,20 @@ static void dmzadm_usage(void)
 	       "  --start	: Start the device-mapper target\n"
 	       "  --stop	: Stop the device-mapper target\n");
 
+	printf("Devices\n"
+	       "  For a single device target, a zoned block device\n"
+	       "  must be specified. For a multi-device target, a\n"
+	       "  a list of block devices must be specified, with\n"
+	       "  a regular block device as the first device specified,\n"
+	       "  followed by one or more zoned block devices\n");
+
 	printf("General options\n"
 	       "  --verbose	: Verbose output\n"
 	       "  --vverbose	: Very verbose output\n");
 
 	printf("Format operation options\n"
 	       "  --force	: Force overwrite of existing content\n"
-	       "  --label=<str> : Set the name to <str>\n"
+	       "  --label=<str> : Set the target label name to <str>\n"
 	       "  --seq=<num>	: Number of sequential zones reserved\n"
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
