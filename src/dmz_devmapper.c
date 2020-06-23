@@ -168,8 +168,17 @@ int dmz_create_dm(struct dmz_dev *dev)
 			len += snprintf(params + len, 4096 - len,
 					"%s ", dev->bdev[i].path);
 		}
-	} else
+	} else {
 		sprintf(params, "%s", dev->bdev[0].path);
+		if (dmz_mod_ver == 1) {
+			/*
+			 * V1 kernel modules (prior to kernels 5.8) wrongly
+			 * require the entire backend device capacity to be
+			 * specified.
+			 */
+			capacity = dev->bdev[0].capacity;
+		}
+	}
 
 	if (!dm_task_add_target(dmt, 0, capacity, "zoned", params))
 		goto out;
