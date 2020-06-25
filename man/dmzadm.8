@@ -11,26 +11,21 @@ dmzadm \- manage zoned block device format for use with the dm-zoned device
 mapper
 
 .SH SYNOPSIS
-.B dmzadm
-<
-.I operation
->
-<
-.I [regular-block-device] zoned-block-device
->
-[
-.I options
-]
+.BI dmzadm " <operation> [regular-block-dev] <zoned-block-dev> [zoned-block-dev [...]] [options]"
 
 .SH DESCRIPTION
 .B dmzadm
-is used to format, check and repair a zoned block device used with the dm-zoned
+is used to format, check and repair block devices used with the dm-zoned
 device mapper. 
-\fIzoned-block-device\fP is the device node corresponding to the target zoned
+\fIzoned-block-dev\fP is the device node corresponding to the target zoned
 blocks device (e.g.
 \fI/dev/sdXX\fP).
-\fIregular-block-device\fP is the optional device node corresponding to a
-regular block device to be used together with the zoned block devoce.
+\fIregular-block-dev\fP is the optional device node corresponding to a
+regular block device to be used together with the zoned block device to store
+metadata and to act as the conventional zone storage space for the zoned
+devices. More than one zoned block device can be specified. If multiple zoned
+block device is specified, all devices must have the same zone size and a
+regular block device must also be specified.
 \fIoperation\fP specifies the action to be taken for the device.
 .PP
 The exit code returned by
@@ -43,8 +38,8 @@ dmzadm allows the following operations.
 
 .TP
 .B Format
-Write to the zoned block device and optional regular block device dm-zoned
-metadata, whiping clean all data that was stored on the device.
+Write to the zoned block device(s) and optional regular block device dm-zoned
+metadata, whiping clean all data that was stored on the device(s).
 
 .TP
 .B Check
@@ -55,21 +50,21 @@ the
 
 .TP
 .B Repair
-Check the device metadata consistency and try to repair any error
+Check the consistency of the device(s) metadata and try to repair any error
 detected.
 
 .TP
 .B Start
-Load the metadata information from disk(s) and activate the device-mapper
+Load the metadata information from the device(s) and activate the dm-zoned
 target.
 
 .TP
 .B Stop
-Deactivate the device-mapper target associated with the block device(s).
+Deactivate the dm-zoned target associated with the block device(s).
 
 .TP
 .B Help
-Print a short usage description of dmzadm
+Print a short usage description of dmzadm.
 
 .SH OPTIONS
 
@@ -112,11 +107,12 @@ Verbose output detailing actions taken.
 Very detailed output of actions taken.
 
 .TP
-\fIFormat\fP operation options:
+Format operation options:
 
 .TP
 .BR \-\-seq=<num>
-Specify the number of sequential zones to be reserved for reclaim.
+Specify the number of sequential zones to be reserved for reclaim
+(default: 16 per zoned block device).
 
 .TP
 .BR \-\-label=<str>
@@ -124,7 +120,6 @@ Sets the name for the device-mapper device. Defaults to
 .I dmz-<devname>
 .
 
-.TP
 .SH AUTHOR
 This version of
 .B dmzadm
