@@ -28,7 +28,7 @@
 *.i*86
 *.x86_64
 *.hex
-src/dmzadm
+dmzadm
 
 # Kernel compile files
 *.symvers
@@ -64,3 +64,13 @@ libtool
 .libs
 .dirstamp
 
+# RPM build filed and directories
+dmzadm.pc
+rpmbuild/BUILDROOT
+rpmbuild/BUILD
+rpmbuild/RPMS
+rpmbuild/SOURCES
+rpmbuild/SPECS
+rpmbuild/SRPMS
+*.tar.gz
+*.rpm

@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2019 Western Digital Corporation or its affiliates.
 
-AC_INIT([dm-zoned tools], [2.0.0], [damien.lemoal@wdc.com])
+AC_INIT([dmzadm], [2.0.0], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)
 AC_CONFIG_HEADER([src/config.h])
@@ -56,9 +56,8 @@ AC_SEARCH_LIBS([kmod_module_ref], [kmod], [],
 		[AC_MSG_ERROR([Couldn't find libkmod])])
 
 AC_CONFIG_FILES([
+	dmzadm.pc
 	Makefile
-	man/Makefile
-	src/Makefile
 ])
 
 AC_OUTPUT

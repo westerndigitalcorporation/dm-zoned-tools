@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: CC0-1.0
+#
+# Copyright (C) 2020 Western Digital Corporation or its affiliates.
+
+AM_CPPFLAGS = -O2 -Wall -Wextra -Wno-unused-parameter
+
+sbin_PROGRAMS += dmzadm
+dmzadm_SOURCES = \
+	src/dmz_dev.c \
+	src/dmz_lib.c \
+	src/dmz_format.c \
+	src/dmz_check.c \
+	src/dmz_devmapper.c \
+	src/dmzadm.c \
+	src/dmz.h
+dmzadm_LDADD =
+dmzadm_LDFLAGS = -lblkid -luuid -ldevmapper -lkmod
