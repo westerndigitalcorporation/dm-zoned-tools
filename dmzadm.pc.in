@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# SPDX-FileCopyrightText: 2020 Western Digital Corporation or its affiliates.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+Name:           dmzadm
+Description:    A program to format, check and repair Linux dm-zoned devices
+Version:        @PACKAGE_VERSION@
+

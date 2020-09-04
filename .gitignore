@@ -66,6 +66,7 @@ libtool
 
 # RPM build filed and directories
 dmzadm.pc
+!dmzadm.pc.in
 rpmbuild/BUILDROOT
 rpmbuild/BUILD
 rpmbuild/RPMS
