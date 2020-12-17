@@ -106,7 +106,7 @@ static int dmz_dev_busy(struct dmz_block_dev *dev, char *holder)
 	int n, ret = 0;
 
 	snprintf(path, sizeof(path),
-		 "/sys/block/%s/holders",
+		 "/sys/class/block/%s/holders",
 		 dev->name);
 
 	n = scandir(path, &namelist, NULL, alphasort);
@@ -130,6 +130,36 @@ static int dmz_dev_busy(struct dmz_block_dev *dev, char *holder)
 }
 
 /*
+ * Check if a device is a partition.
+ */
+static int dmz_dev_is_partition(struct dmz_block_dev *dev)
+{
+	char str[PATH_MAX] = {};
+	FILE *file;
+	int len;
+
+	len = snprintf(str, sizeof(str),
+		       "/sys/class/block/%s/partition",
+		       dev->name);
+	if (len >= PATH_MAX) {
+		fprintf(stderr, "name %s failed: %s\n", str,
+			strerror(ENAMETOOLONG));
+		return -1;
+	}
+
+	file = fopen(str, "r");
+	if (!file) {
+		if (errno != ENOENT)
+			return -1;
+		return 0;
+	}
+
+	fclose(file);
+
+	return 1;
+}
+
+/*
  * Get a zoned block device model (host-aware or howt-managed).
  */
 static int dmz_get_dev_model(struct dmz_block_dev *dev)
@@ -138,6 +168,17 @@ static int dmz_get_dev_model(struct dmz_block_dev *dev)
 	FILE *file;
 	int res;
 	int len;
+
+	/* Cache devices could be partitions. Check that */
+	res = dmz_dev_is_partition(dev);
+	if (res < 0)
+		return res;
+
+	if (res) {
+		/* This is a partition: only regular devices can have one */
+		dev->type = DMZ_TYPE_REGULAR;
+		return 0;
+	}
 
 	/* Check that this is a zoned block device */
 	len = snprintf(str, sizeof(str),
