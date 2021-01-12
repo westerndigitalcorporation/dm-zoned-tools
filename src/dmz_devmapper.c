@@ -315,8 +315,11 @@ static int dmz_load_sb(struct dmz_dev *dev)
 		goto out;
 	}
 
-       /* Check UUID for V2 metadata */
-	if (__le32_to_cpu(sb->version) > 1) {
+	/* Check UUID for V2 metadata */
+	dev->sb_version = __le32_to_cpu(sb->version);
+	switch (dev->sb_version) {
+	case DMZ_DM_VER:
+	case 2:
 		if (uuid_is_null(sb->dmz_uuid)) {
 			fprintf(stderr, "%s: DM-Zoned UUID is null\n",
 				dev->bdev[0].name);
@@ -325,6 +328,13 @@ static int dmz_load_sb(struct dmz_dev *dev)
 		}
 		uuid_copy(dev->uuid, sb->dmz_uuid);
 		strncpy(dev->label, (const char *)sb->dmz_label, 32);
+		break;
+	case 1:
+		break;
+	default:
+		fprintf(stderr,
+			"%s: invalid metadata version %u\n",
+			dev->bdev[0].name, dev->sb_version);
 	}
 
 	/* OK */
@@ -366,11 +376,14 @@ int dmz_start(struct dmz_dev *dev)
 		char dmz_uuid[UUID_STR_LEN];
 
 		uuid_unparse(dev->uuid, dmz_uuid);
-		printf("%s: starting %s uuid %s\n",
-		       dev->bdev[0].name, dev->label, dmz_uuid);
-	} else
-		printf("%s: starting %s\n",
-		       dev->bdev[0].name, dev->label);
+		printf("%s: starting %s, metadata ver. %u, uuid %s\n",
+		       dev->bdev[0].name, dev->label,
+		       dev->sb_version, dmz_uuid);
+	} else {
+		printf("%s: starting %s, metadata ver. %u,\n",
+		       dev->bdev[0].name, dev->label,
+		       dev->sb_version);
+	}
 
 	if (dmz_create_dm(dev)) {
 		fprintf(stderr,
