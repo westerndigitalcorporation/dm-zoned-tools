@@ -37,6 +37,5 @@ chmod -x $RPM_BUILD_ROOT%{_mandir}/man8/*.8
 %ldconfig_scriptlets
 
 %files
-%{_libdir}/*
 %{_sbindir}/*
 %{_mandir}/man8/*

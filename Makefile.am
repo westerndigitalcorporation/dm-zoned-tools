@@ -7,9 +7,6 @@ ACLOCAL_AMFLAGS = -I m4
 SUBDIRS = . $(subdirs)
 EXTRA_DIST = autogen.sh
 
-pkgconfdir = $(libdir)/pkgconfig
-
-pkgconf_DATA = dmzadm.pc
 sbin_PROGRAMS =
 
 dist_man8_MANS =

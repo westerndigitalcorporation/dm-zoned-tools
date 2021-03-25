@@ -67,7 +67,6 @@ AM_CONDITIONAL([BUILD_RPM],
 		[test "x$RPMBUILD" != xnotfound && test "x$RPM" != xnotfound])
 
 AC_CONFIG_FILES([
-	dmzadm.pc
 	Makefile
 ])
 
