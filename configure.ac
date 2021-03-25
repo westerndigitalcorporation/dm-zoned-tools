@@ -68,6 +68,8 @@ AM_CONDITIONAL([BUILD_RPM],
 
 AC_CONFIG_FILES([
 	Makefile
+	man/Makefile
+        src/Makefile
 ])
 
 AC_OUTPUT

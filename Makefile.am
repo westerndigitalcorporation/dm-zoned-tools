@@ -4,15 +4,8 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = . $(subdirs)
+SUBDIRS = src man
 EXTRA_DIST = autogen.sh
-
-sbin_PROGRAMS =
-
-dist_man8_MANS =
-
-include src/Makemodule.am
-include man/Makemodule.am
 
 if BUILD_RPM
 

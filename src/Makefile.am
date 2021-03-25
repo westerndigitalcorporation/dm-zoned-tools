@@ -4,14 +4,16 @@
 
 AM_CPPFLAGS = -O2 -Wall -Wextra -Wno-unused-parameter
 
-sbin_PROGRAMS += dmzadm
-dmzadm_SOURCES = \
-	src/dmz_dev.c \
-	src/dmz_lib.c \
-	src/dmz_format.c \
-	src/dmz_check.c \
-	src/dmz_devmapper.c \
-	src/dmzadm.c \
-	src/dmz.h
+sbin_PROGRAMS = dmzadm
+
+CFILES = dmz_dev.c \
+	dmz_lib.c \
+	dmz_format.c \
+	dmz_check.c \
+	dmz_devmapper.c \
+	dmzadm.c
+HFILES = dmz.h
+
+dmzadm_SOURCES = ${CFILES} ${HFILES}
 dmzadm_LDADD =
 dmzadm_LDFLAGS = -lblkid -luuid -ldevmapper -lkmod

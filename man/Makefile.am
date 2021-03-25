@@ -2,4 +2,4 @@
 #
 # Copyright (C) 2020 Western Digital Corporation or its affiliates.
 
-dist_man8_MANS += man/dmzadm.8
+dist_man8_MANS = dmzadm.8
