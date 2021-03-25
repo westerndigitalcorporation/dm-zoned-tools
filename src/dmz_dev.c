@@ -339,6 +339,18 @@ static void dmz_print_zone(struct dmz_dev *dev,
 	       dmz_zone_wp_sector(zone));
 }
 
+#ifdef HAVE_BLK_ZONE_REP_V2
+static __u64 dmz_zone_capacity(struct blk_zone *blkz)
+{
+	return blkz->capacity;
+}
+#else
+static __u64 dmz_zone_capacity(struct blk_zone *blkz)
+{
+	return dmz_zone_length(blkz);
+}
+#endif
+
 #define DMZ_REPORT_ZONES_BUFSZ	524288
 
 /*
@@ -430,6 +442,16 @@ int dmz_get_dev_zones(struct dmz_dev *dev)
 					"%s: Invalid zone %u size\n",
 					bdev->name,
 					dmz_zone_id(dev, blkz));
+				ret = -1;
+				goto out;
+			}
+
+			/* Check zone capacity */
+			if (dmz_zone_capacity(blkz) < dmz_zone_length(blkz)) {
+				fprintf(stderr,
+					"%s: Unsupported device with zone "
+					"capacity smaller than zone size\n",
+					bdev->name);
 				ret = -1;
 				goto out;
 			}

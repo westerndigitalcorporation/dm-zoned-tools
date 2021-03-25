@@ -42,6 +42,11 @@ AC_CHECK_HEADER(libdevmapper.h, [],
 AC_CHECK_HEADER(libkmod.h, [],
 		[AC_MSG_ERROR([Couldn't find libkmod.h])])
 
+AC_CHECK_MEMBER([struct blk_zone.capacity],
+		[AC_DEFINE(HAVE_BLK_ZONE_REP_V2, [1],
+			   [report zones includes zone capacity])],
+		[], [[#include <linux/blkzoned.h>]])
+
 # Checks for libraries.
 AC_SEARCH_LIBS([blkid_do_fullprobe], [blkid], [],
 	       [AC_MSG_ERROR([Couldn't find libblkid])])
