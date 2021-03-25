@@ -43,9 +43,7 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone)
 	struct blk_zone_range range;
 	__u64 zone_sector;
 
-	if (dmz_zone_unknown(zone) ||
-	    dmz_zone_conv(zone) ||
-	    dmz_zone_empty(zone))
+	if (dmz_zone_unknown(zone) || dmz_zone_conv(zone))
 		return 0;
 
 	bdev = dmz_sector_to_bdev(dev, dmz_zone_sector(zone), &zone_sector);
