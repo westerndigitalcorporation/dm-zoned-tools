@@ -2,7 +2,7 @@
 #
 # Copyright (C) 2019 Western Digital Corporation or its affiliates.
 
-AC_INIT([dmzadm], [2.0.2], [damien.lemoal@wdc.com])
+AC_INIT([dm-zoned-tools], [2.0.2], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)
 AC_CONFIG_HEADER([src/config.h])
@@ -59,6 +59,12 @@ AC_SEARCH_LIBS([dm_task_run], [devmapper], [],
 
 AC_SEARCH_LIBS([kmod_module_ref], [kmod], [],
 		[AC_MSG_ERROR([Couldn't find libkmod])])
+
+# Checks for rpm package builds
+AC_PATH_PROG([RPMBUILD], [rpmbuild], [notfound])
+AC_PATH_PROG([RPM], [rpm], [notfound])
+AM_CONDITIONAL([BUILD_RPM],
+		[test "x$RPMBUILD" != xnotfound && test "x$RPM" != xnotfound])
 
 AC_CONFIG_FILES([
 	dmzadm.pc

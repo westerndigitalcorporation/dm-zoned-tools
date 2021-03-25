@@ -2,7 +2,7 @@
 #
 # Copyright (c) 2020 Western Digital Corporation or its affiliates.
 
-Name:           dmzadm
+Name:           dm-zoned-tools
 Release:        1%{?dist}
 Summary:        A program to format, check and repair Linux dm-zoned devices
 Group:		System Environment/Libraries
@@ -16,8 +16,9 @@ BuildRequires:  libtool
 BuildRequires:  gcc
 
 %description
-The dmzadm program is used to format, check and repair zoned block
-devices used with Linux dm-zoned device mapper target driver.
+This package provides the dmzadm utility which can be used to format, check
+and repair zoned block devices used with Linux dm-zoned device mapper target
+driver.
 
 %prep
 %setup

@@ -8,7 +8,6 @@ SUBDIRS = . $(subdirs)
 EXTRA_DIST = autogen.sh
 
 pkgconfdir = $(libdir)/pkgconfig
-rpmdir = $(abs_top_builddir)/rpmbuild
 
 pkgconf_DATA = dmzadm.pc
 sbin_PROGRAMS =
@@ -18,29 +17,30 @@ dist_man8_MANS =
 include src/Makemodule.am
 include man/Makemodule.am
 
-rpm: dist
-	@mkdir -p $(rpmdir)/BUILD
-	@mkdir -p $(rpmdir)/RPMS
-	@mkdir -p $(rpmdir)/SOURCES
-	@mkdir -p $(rpmdir)/SPECS
-	@mkdir -p $(rpmdir)/SRPMS
-	@mv dmzadm-$(PACKAGE_VERSION).tar.gz $(rpmdir)/SOURCES/
-	@echo "Version:        $(PACKAGE_VERSION)" > $(rpmdir)/SPECS/dmzadm.spec
-	@cat $(rpmdir)/dmzadm.spec.in >> $(rpmdir)/SPECS/dmzadm.spec
-	@rpmbuild -bs -v \
-		--target="$(build_cpu)" \
-		-D "_topdir $(rpmdir)" \
-		--nodebuginfo "$(rpmdir)/SPECS/dmzadm.spec"
+if BUILD_RPM
+
+rpmdir = $(abs_top_builddir)/rpmbuild
+
+EXTRA_DIST += dm-zoned-tools.spec
+RPMARCH=`$(RPM) --eval %_target_cpu`
+
+spec: dm-zoned-tools.spec.in
+	@echo "Generating rpm spec file..."
+	@echo "Version:        $(PACKAGE_VERSION)" > dm-zoned-tools.spec
+	@cat dm-zoned-tools.spec.in | grep -v '# ' >> dm-zoned-tools.spec
+
+rpm: spec dist
+	@echo "Building RPM package..."
+	@mkdir -p $(rpmdir)
+	$(RPMBUILD) -ta --clean -D "_topdir $(rpmdir)" dm-zoned-tools-$(PACKAGE_VERSION).tar.gz
+	@mv -f $(rpmdir)/RPMS/$(RPMARCH)/*.rpm $(abs_top_builddir)
 	@mv -f $(rpmdir)/SRPMS/*.rpm $(abs_top_builddir)
-	@rpmbuild -bb -v \
-		--target="$(build_cpu)" \
-		-D "_topdir $(rpmdir)" \
-		--nodebuginfo "$(rpmdir)/SPECS/dmzadm.spec"
-	@mv -f $(rpmdir)/RPMS/$(build_cpu)/*.rpm $(abs_top_builddir)
-	@rm -rf $(rpmdir)/SRPMS
-	@rm -rf $(rpmdir)/SPECS
-	@rm -rf $(rpmdir)/SOURCES
-	@rm -rf $(rpmdir)/RPMS
-	@rm -rf $(rpmdir)/BUILDROOT
-	@rm -rf $(rpmdir)/BUILD
+	@rm -rf $(rpmdir)
+	@rm -f dm-zoned-tools-$(PACKAGE_VERSION).tar.gz
+	@rm -f dm-zoned-tools.spec
+else
+rpm:
+	@echo "Building RPM packages requires rpmbuild and rpm utilities"
+	exit 1
+endif
 
