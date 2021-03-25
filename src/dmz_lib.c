@@ -14,6 +14,8 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 /*
  * For super block checksum (CRC32)
@@ -32,6 +34,61 @@ __u32 dmz_crc32(__u32 crc, const void *buf, size_t length)
 	}
 
 	return crc;
+}
+
+/*
+ * Check that the device supports reset all zones operation.
+ * For now, simply exclude DM devices as that operation is never
+ * supported on these devices.
+ */
+static bool dmz_bdev_has_reset_all(struct dmz_block_dev *bdev)
+{
+	char path[PATH_MAX];
+	struct stat st;
+	int len;
+
+	if (bdev->type == DMZ_TYPE_REGULAR)
+		return false;
+
+	/* Check if this is a DM device */
+	len = snprintf(path, sizeof(path),
+		       "/sys/block/%s/dm/name",
+		       bdev->name);
+	if (len >= PATH_MAX)
+		return false;
+
+	return stat(path, &st) != 0;
+}
+
+/*
+ * Reset all zones of a device.
+ */
+static int dmz_reset_all_zones(struct dmz_dev *dev,
+			       struct blk_zone *zone)
+{
+	struct dmz_block_dev *bdev;
+	struct blk_zone_range range;
+	__u64 zone_sector;
+	unsigned int i;
+	int ret;
+
+	bdev = dmz_sector_to_bdev(dev, dmz_zone_sector(zone), &zone_sector);
+	if (zone_sector != 0 || !dmz_bdev_has_reset_all(bdev))
+		return 0;
+
+	range.sector = 0;
+	range.nr_sectors = bdev->capacity;
+
+	ret = ioctl(bdev->fd, BLKRESETZONE, &range);
+	if (ret != 0)
+		return ret;
+
+	for (i = 0; i < bdev->nr_zones; i++, zone++) {
+		if (dmz_zone_seq_req(zone) || dmz_zone_seq_pref(zone))
+			zone->wp = zone->start;
+	}
+
+	return bdev->nr_zones;
 }
 
 /*
@@ -70,11 +127,28 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone)
  */
 int dmz_reset_zones(struct dmz_dev *dev)
 {
-	unsigned int i;
+	struct blk_zone *zone;
+	unsigned int i = 0;
+	int ret;
 
-	for (i = 0; i < dev->nr_zones; i++) {
-		if (dmz_reset_zone(dev, &dev->zones[i]) < 0)
+	while (i < dev->nr_zones) {
+		zone = &dev->zones[i];
+
+		/*
+		 * Try reset all zones of the current bdev. If the device does
+		 * not support this operation, continue resetting the device
+		 * zones one at a time.
+		 */
+		ret = dmz_reset_all_zones(dev, zone);
+		if (ret > 0) {
+			i += ret;
+			continue;
+		}
+
+		if (dmz_reset_zone(dev, zone) < 0)
 			return -1;
+
+		i++;
 	}
 
 	return 0;
