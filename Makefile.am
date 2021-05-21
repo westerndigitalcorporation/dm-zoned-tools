@@ -5,7 +5,7 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = src man
-EXTRA_DIST = autogen.sh
+EXTRA_DIST = autogen.sh COPYING.GPL CONTRIBUTING README.md
 
 if BUILD_RPM
 
@@ -14,20 +14,15 @@ rpmdir = $(abs_top_builddir)/rpmbuild
 EXTRA_DIST += dm-zoned-tools.spec
 RPMARCH=`$(RPM) --eval %_target_cpu`
 
-spec: dm-zoned-tools.spec.in
-	@echo "Generating rpm spec file..."
-	@echo "Version:        $(PACKAGE_VERSION)" > dm-zoned-tools.spec
-	@cat dm-zoned-tools.spec.in | grep -v '# ' >> dm-zoned-tools.spec
-
-rpm: spec dist
+rpm: dist
 	@echo "Building RPM package..."
 	@mkdir -p $(rpmdir)
-	$(RPMBUILD) -ta --clean -D "_topdir $(rpmdir)" dm-zoned-tools-$(PACKAGE_VERSION).tar.gz
+	@mv dm-zoned-tools-$(PACKAGE_VERSION).tar.gz v$(PACKAGE_VERSION).tar.gz
+	$(RPMBUILD) -ta --clean -D "_topdir $(rpmdir)" v$(PACKAGE_VERSION).tar.gz
 	@mv -f $(rpmdir)/RPMS/$(RPMARCH)/*.rpm $(abs_top_builddir)
 	@mv -f $(rpmdir)/SRPMS/*.rpm $(abs_top_builddir)
 	@rm -rf $(rpmdir)
-	@rm -f dm-zoned-tools-$(PACKAGE_VERSION).tar.gz
-	@rm -f dm-zoned-tools.spec
+	@rm -f v$(PACKAGE_VERSION).tar.gz
 else
 rpm:
 	@echo "Building RPM packages requires rpmbuild and rpm utilities"
