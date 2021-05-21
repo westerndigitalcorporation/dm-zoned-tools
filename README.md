@@ -88,9 +88,9 @@ The following packages must be installed prior to compiling.
 The following commands will compile the *dmzadm* tool.
 
 ```
-> sh ./autogen.sh
-> ./configure
-> make
+$ sh ./autogen.sh
+$ ./configure
+$ make
 ```
 
 ## Installation
@@ -99,7 +99,7 @@ To install the compiled *dmzadm* executable file, simply execute as root the
 following command.
 
 ```
-> make install
+$ make install
 ```
 
 The default installation directory is `/usr/sbin`. This default location can be
@@ -107,7 +107,30 @@ changed using the configure script. Executing the following command displays
 the options used to control the installation path.
 
 ```
-> ./configure --help
+$ ./configure --help
+```
+
+## Building RPM Packages
+
+The *rpm* and *rpmbuild* utilities are necessary to build *dm-zoned-tools* RPM
+packages. Once these utilities are installed, the RPM packages can be built
+using the following command.
+
+```
+$ sh ./autogen.sh
+$ ./configure
+$ make rpm
+```
+
+Four RPM packages are built: a binary package providing *dmmzadm* executable
+and its documentation and license files, a source RPM package, a *debuginfo*
+RPM package and a *debugsource* RPM package.
+
+The source RPM package can be used to build the binary and debug RPM packages
+outside of *dm-zoned-tools* source tree using the following command.
+
+```
+$ rpmbuild --rebuild dm-zoned-tools-<version>.src.rpm
 ```
 
 ## Usage
