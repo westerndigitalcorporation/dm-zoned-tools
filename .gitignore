@@ -65,8 +65,6 @@ libtool
 .libs
 .dirstamp
 
-# RPM build filed and directories
-dmzadm.pc
-!dmzadm.pc.in
+# RPM build files and directories
 *.tar.gz
 *.rpm
