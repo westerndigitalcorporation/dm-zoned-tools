@@ -26,12 +26,13 @@ static void dmzadm_usage(void)
 	printf("Usage: dmzadm <operation> <device(s)> [options]\n");
 
 	printf("Operations\n"
-	       "  --help | -h	: General help message\n"
-	       "  --format	: Format a block device metadata\n"
-	       "  --check	: Check a block device metadata\n"
-	       "  --repair	: Repair a block device metadata\n"
-	       "  --start	: Start the device-mapper target\n"
-	       "  --stop	: Stop the device-mapper target\n");
+	       "  --version | -v : Print version number and exit\n"
+	       "  --help | -h	 : General help message\n"
+	       "  --format	 : Format a block device metadata\n"
+	       "  --check	 : Check a block device metadata\n"
+	       "  --repair	 : Repair a block device metadata\n"
+	       "  --start	 : Start the device-mapper target\n"
+	       "  --stop	 : Stop the device-mapper target\n");
 
 	printf("Devices\n"
 	       "  For a single device target, a zoned block device\n"
@@ -77,13 +78,23 @@ int main(int argc, char **argv)
 	enum dmz_op op;
 
 	/* Parse operation */
-	if (argc < 2 ||
-	    strcmp(argv[1], "--help") == 0 ||
+	if (argc < 2) {
+		dmzadm_usage();
+		return 1;
+	}
+
+	if (strcmp(argv[1], "--help") == 0 ||
 	    strcmp(argv[1], "-h") == 0) {
 		printf("dmzadm allows formatting, checking and repairing\n"
 		       "a zoned block device for use with the dm-zoned\n"
 		       "device mapper.\n");
 		dmzadm_usage();
+		return 0;
+	}
+
+	if (strcmp(argv[1], "--version") == 0 ||
+	    strcmp(argv[1], "-v") == 0) {
+		printf("%s\n", PACKAGE_VERSION);
 		return 0;
 	}
 
