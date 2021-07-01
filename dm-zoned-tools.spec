@@ -1,5 +1,5 @@
 Name:		dm-zoned-tools
-Version:	2.1.2
+Version:	2.1.3
 Release:	1%{?dist}
 Summary:	Provides utilities to format, check and repair Linux dm-zoned devices
 
@@ -15,6 +15,7 @@ BuildRequires:	autoconf
 BuildRequires:	autoconf-archive
 BuildRequires:	automake
 BuildRequires:	libtool
+BuildRequires:	make
 BuildRequires:	gcc
 
 %description
@@ -41,5 +42,8 @@ sh autogen.sh
 %doc README.md CONTRIBUTING
 
 %changelog
+* Thu Jul 01 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.1.3-1
+- Add "make" as a build dependency 
+- Version 2.1.3 package
 * Mon Jun 14 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.1.2-1
 - Version 2.1.2 initial package
