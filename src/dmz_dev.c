@@ -328,6 +328,14 @@ static void dmz_print_zone(struct dmz_dev *dev,
 #ifdef HAVE_BLK_ZONE_REP_V2
 static __u64 dmz_zone_capacity(struct blk_zone *blkz)
 {
+	/*
+	 * If dmzadm was compiled using a system supporting zone capacity but
+	 * is executed on another system without zone capacity support, the
+	 * capacity field will always be reported as 0. In this case, simply
+	 * return the zone length.
+	 */
+	if (!blkz->capacity)
+		return dmz_zone_length(blkz);
 	return blkz->capacity;
 }
 #else
