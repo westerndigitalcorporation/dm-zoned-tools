@@ -13,9 +13,11 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 
 /*
  * For super block checksum (CRC32)
@@ -37,6 +39,37 @@ __u32 dmz_crc32(__u32 crc, const void *buf, size_t length)
 }
 
 /*
+ * Get the kernel version to check for the ALL zone reset operation support
+ * in kernel versions 5.4 and above.
+ */
+static void dmz_get_kern_ver(int *major, int *minor)
+{
+	struct utsname buffer;
+	long ver[2];
+	int i = 0;
+	char *p;
+
+	*major = 0;
+	*minor = 0;
+
+	if (uname(&buffer) != 0)
+		return;
+
+	p = buffer.release;
+	while (*p && i < 2) {
+		if (isdigit(*p)) {
+			ver[i] = strtol(p, &p, 10);
+			i++;
+		} else {
+			p++;
+		}
+	}
+
+	*major = ver[0];
+	*minor = ver[1];
+}
+
+/*
  * Check that the device supports reset all zones operation.
  * For now, simply exclude DM devices as that operation is never
  * supported on these devices.
@@ -45,9 +78,15 @@ static bool dmz_bdev_has_reset_all(struct dmz_block_dev *bdev)
 {
 	char path[PATH_MAX];
 	struct stat st;
-	int len;
+	int len, major, minor;
 
+	/* Regular (cache) devices do not have reset operation */
 	if (bdev->type == DMZ_TYPE_REGULAR)
+		return false;
+
+	/* The kernel implements reset ALL operation from verion 5.4 */
+	dmz_get_kern_ver(&major, &minor);
+	if (major < 5 || (major == 5 && minor < 4))
 		return false;
 
 	/* Check if this is a DM device */
