@@ -267,28 +267,14 @@ static int dmz_get_dev_capacity(struct dmz_block_dev *dev)
 	dev->zone_nr_blocks = dmz_sect2blk(dev->zone_nr_sectors);
 
 	/* Get number of zones */
-	snprintf(str, sizeof(str),
-		 "/sys/block/%s/queue/nr_zones",
-		 dev->name);
-	file = fopen(str, "r");
-	if (!file) {
-		fprintf(stderr, "Open %s failed\n", str);
-		return -1;
-	}
-
-	memset(str, 0, sizeof(str));
-	res = fscanf(file, "%s", str);
-	fclose(file);
-
-	if (res != 1) {
-		fprintf(stderr, "Invalid file %s format\n", str);
-		return -1;
-	}
-	dev->nr_zones = atol(str);
+	dev->nr_zones = dev->capacity / dev->zone_nr_sectors;
+	if (dev->capacity % dev->zone_nr_sectors)
+		dev->nr_zones++;
 	if (!dev->nr_zones) {
 		fprintf(stderr, "%s: invalid number of zones\n", dev->path);
 		return -1;
 	}
+
 	return 0;
 }
 
