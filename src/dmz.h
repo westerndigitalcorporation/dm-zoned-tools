@@ -19,6 +19,19 @@
 #include <linux/blkzoned.h>
 #include <uuid/uuid.h>
 
+/*
+ * Length of textual representation of UUID, including trailing \0.
+ * UUID_STR_LEN and UUID_LEN are not defined in uuid.h for util-linux
+ * versions older than 2.19.
+ */
+#ifndef UUID_STR_LEN
+#define UUID_STR_LEN	37
+#endif
+
+#ifndef UUIDLEN
+#define UUID_LEN	(sizeof(uuid_t))
+#endif
+
 /* Unknown block zone type */
 #define BLK_ZONE_TYPE_UNKNOWN	0
 
