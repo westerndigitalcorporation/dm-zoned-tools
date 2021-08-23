@@ -138,8 +138,14 @@ int main(int argc, char **argv)
 	}
 	dev->nr_bdev = optnum - 2;
 	dev->bdev = malloc(sizeof(struct dmz_block_dev) * dev->nr_bdev);
-	for (i = 0; i < dev->nr_bdev; i++)
-		dev->bdev[i].path = argv[i + 2];
+	for (i = 0; i < dev->nr_bdev; i++) {
+		dev->bdev[i].path = realpath(argv[i + 2], NULL);
+		if (!dev->bdev[i].path) {
+			fprintf(stderr, "Get device %s real path failed\n",
+				argv[i + 2]);
+			return 1;
+		}
+	}
 
 	/* Parse arguments */
 	for (i = optnum; i < argc; i++) {
