@@ -40,6 +40,8 @@ AC_CHECK_HEADER(libdevmapper.h, [],
 		[AC_MSG_ERROR([Couldn't find libdevmapper.h])])
 AC_CHECK_HEADER(libkmod.h, [],
 		[AC_MSG_ERROR([Couldn't find libkmod.h])])
+AC_CHECK_HEADER(libudev.h, [],
+		[AC_MSG_ERROR([Couldn't find libudev.h (install systemd-devel)])])
 
 AC_CHECK_MEMBER([struct blk_zone.capacity],
 		[AC_DEFINE(HAVE_BLK_ZONE_REP_V2, [1],
@@ -58,6 +60,9 @@ AC_SEARCH_LIBS([dm_task_run], [devmapper], [],
 
 AC_SEARCH_LIBS([kmod_module_ref], [kmod], [],
 		[AC_MSG_ERROR([Couldn't find libkmod])])
+
+AC_SEARCH_LIBS([udev_new], [udev], [],
+		[AC_MSG_ERROR([Couldn't find libudev])])
 
 # Checks for rpm package builds
 AC_PATH_PROG([RPMBUILD], [rpmbuild], [notfound])

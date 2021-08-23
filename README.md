@@ -78,6 +78,8 @@ The following packages must be installed prior to compiling.
   packages)
 * libblkid library and its development headers (*libblkid* and *libblkid-devel*
   packages)
+* libudev library and its development headers (*systemd* and *systemd-devel*
+  packages)
 * device-mapper libraries and development headers (*device-mapper-libs* and
   *device-mapper-devel* packages)
 * Linux kernel module management libraries and development headers (*kmod* and

@@ -187,6 +187,7 @@ enum dmz_op {
 	DMZ_OP_FORMAT = 1,
 	DMZ_OP_CHECK,
 	DMZ_OP_REPAIR,
+	DMZ_OP_RELABEL,
 	DMZ_OP_START,
 	DMZ_OP_STOP,
 };
@@ -197,6 +198,7 @@ enum dmz_op {
 struct dmz_block_dev {
 	char		*path;
 	char		*name;
+	char		*serial;
 
 	enum dmz_dev_type type;
 
@@ -224,6 +226,7 @@ struct dmz_dev {
 	int		op;
 	unsigned int	flags;
 	char		label[DMZ_LABEL_LEN];
+	char		new_label[DMZ_LABEL_LEN];
 	uuid_t		uuid;
 
 	/* Device info */
@@ -396,7 +399,7 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 int dmz_reset_zones(struct dmz_dev *dev);
 int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
 int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
-void dmz_set_label(struct dmz_dev *dev, char *label, bool check);
+void dmz_get_label(struct dmz_dev *dev, char *label, bool check);
 
 __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
@@ -405,6 +408,7 @@ int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
 int dmz_format(struct dmz_dev *dev);
 int dmz_check(struct dmz_dev *dev);
 int dmz_repair(struct dmz_dev *dev);
+int dmz_relabel(struct dmz_dev *dev);
 int dmz_init_dm(int log_level);
 int dmz_start(struct dmz_dev *dev);
 int dmz_stop(struct dmz_dev *dev, char *dm_dev);

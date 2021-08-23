@@ -1324,3 +1324,86 @@ int dmz_repair(struct dmz_dev *dev)
 	return 0;
 }
 
+/*
+ * Change a device label.
+ */
+int dmz_relabel(struct dmz_dev *dev)
+{
+	struct dmz_meta_set mset[3];
+	int i, ret;
+
+	/* Init */
+	memset(mset, 0, sizeof(struct dmz_meta_set) * 3);
+	mset[1].id = 1;
+	mset[2].id = 2;
+
+	/* Check superblocks */
+	ret = dmz_check_superblocks(dev, mset);
+	if (ret != 0) {
+		fprintf(stderr,
+			"Check device superblocks failed\n");
+		return -1;
+	}
+
+	ret = dmz_check_tertiary_superblocks(dev);
+	if (ret == 0)
+		mset[2].flags |= DMZ_MSET_VALID;
+
+	if (!(mset[0].flags & DMZ_MSET_VALID) ||
+	    !(mset[1].flags & DMZ_MSET_VALID) ||
+	    !(mset[2].flags & DMZ_MSET_VALID))
+		goto err;
+
+	dmz_get_label(dev, dev->new_label, false);
+	if (strcmp((char *)dev->label, dev->new_label) == 0) {
+		printf("Device label already set to %s\n",
+		       dev->new_label);
+		return 0;
+	}
+
+	printf("Relabeling from %s to %s\n",
+	       dev->label, dev->new_label);
+
+	memcpy(dev->label, dev->new_label, DMZ_LABEL_LEN);
+
+	/* Update primary super block */
+	ret = dmz_write_super(dev, mset[0].gen, 0);
+	if (ret) {
+		fprintf(stderr, "Relabel primary super block failed\n");
+		goto err;
+	}
+
+	/* Update primary super block */
+	ret = dmz_write_super(dev, mset[1].gen,
+			      dev->zone_nr_blocks * dev->nr_meta_zones);
+	if (ret) {
+		fprintf(stderr, "Relabel secondary super block failed\n");
+		goto err;
+	}
+
+	if (dev->sb_version > 1 && dev->nr_bdev > 1) {
+		/* Update tertiary super blocks */
+		for (i = 1; i < dev->nr_bdev; i++) {
+			ret = dmz_write_super(dev, 0,
+					      dev->bdev[i].block_offset);
+			if (ret) {
+				fprintf(stderr,
+					"Relabel tertiary super block failed\n");
+				goto err;
+			}
+		}
+	}
+
+	/* Sync devices */
+	for (i = 0; i < dev->nr_bdev; i++) {
+		if (dmz_sync_dev(&dev->bdev[i]) < 0)
+			return -1;
+	}
+
+	return 0;
+
+err:
+	dmz_msg(dev, 0, "Check and repair required\n");
+
+	return -1;
+}

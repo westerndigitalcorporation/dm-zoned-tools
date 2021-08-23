@@ -16,4 +16,4 @@ HFILES = dmz.h
 
 dmzadm_SOURCES = ${CFILES} ${HFILES}
 dmzadm_LDADD =
-dmzadm_LDFLAGS = -lblkid -luuid -ldevmapper -lkmod
+dmzadm_LDFLAGS = -lblkid -luuid -ldevmapper -lkmod -ludev

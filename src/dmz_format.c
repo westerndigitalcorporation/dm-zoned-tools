@@ -210,7 +210,7 @@ int dmz_format(struct dmz_dev *dev)
 		}
 	}
 
-	dmz_set_label(dev, dev->label, false);
+	dmz_get_label(dev, dev->label, false);
 
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_data_zones;

@@ -31,6 +31,7 @@ static void dmzadm_usage(void)
 	       "  --format	 : Format a block device metadata\n"
 	       "  --check	 : Check a block device metadata\n"
 	       "  --repair	 : Repair a block device metadata\n"
+	       "  --relabel	 : Change the device label\n"
 	       "  --start	 : Start the device-mapper target\n"
 	       "  --stop	 : Stop the device-mapper target\n");
 
@@ -52,6 +53,9 @@ static void dmzadm_usage(void)
 	       "                  for reclaim. The minimum is 1 and the\n"
 	       "                  default is %d\n",
 	       DMZ_NR_RESERVED_SEQ);
+
+	printf("Relabel operation options\n"
+	       "  --label=<str> : Set the target new label name to <str>\n");
 }
 
 void print_dev_info(struct dmz_block_dev *bdev)
@@ -104,6 +108,8 @@ int main(int argc, char **argv)
 		op = DMZ_OP_CHECK;
 	} else if (strcmp(argv[1], "--repair") == 0) {
 		op = DMZ_OP_REPAIR;
+	} else if (strcmp(argv[1], "--relabel") == 0) {
+		op = DMZ_OP_RELABEL;
 	} else if (strcmp(argv[1], "--start") == 0) {
 		op = DMZ_OP_START;
 	} else if (strcmp(argv[1], "--stop") == 0) {
@@ -180,7 +186,7 @@ int main(int argc, char **argv)
 			const char *label = argv[i] + 8;
 			unsigned int label_size = strlen(label);
 
-			if (op != DMZ_OP_FORMAT) {
+			if (op != DMZ_OP_FORMAT && op != DMZ_OP_RELABEL) {
 				fprintf(stderr,
 					"--label option is valid only with the "
 					"format operation\n");
@@ -196,7 +202,10 @@ int main(int argc, char **argv)
 					DMZ_LABEL_LEN - 1);
 				return 1;
 			}
-			memcpy(dev->label, label, label_size);
+			if (op == DMZ_OP_FORMAT)
+				memcpy(dev->label, label, label_size);
+			else
+				memcpy(dev->new_label, label, label_size);
 
 		} else if (strcmp(argv[i], "--force") == 0) {
 
@@ -364,6 +373,10 @@ int main(int argc, char **argv)
 
 	case DMZ_OP_REPAIR:
 		ret = dmz_repair(dev);
+		break;
+
+	case DMZ_OP_RELABEL:
+		ret = dmz_relabel(dev);
 		break;
 
 	case DMZ_OP_START:

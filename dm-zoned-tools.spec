@@ -11,6 +11,7 @@ BuildRequires:	device-mapper-devel
 BuildRequires:	kmod-devel
 BuildRequires:	libuuid-devel
 BuildRequires:	libblkid-devel
+BuildRequires:	systemd-devel
 BuildRequires:	autoconf
 BuildRequires:	autoconf-archive
 BuildRequires:	automake

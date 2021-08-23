@@ -349,51 +349,6 @@ out:
 	return ret;
 }
 
-/*
- * Generate a unique label from the dm-zoned UUID.
- */
-void dmz_set_label(struct dmz_dev *dev, char *label, bool check)
-{
-	uuid_t uuid;
-	char uuid_buf[UUID_STR_LEN];
-	char short_uuid[9];
-	char path[128];
-	struct stat st;
-
-	/*
-	 * If the user did not specify a label, generate one from a random
-	 * UUID (meta ver 1) or from the dm-zoned UUID (meta ver 2).
-	 */
-	if (!strlen(label)) {
-		if (dev->sb_version <= 1)
-			uuid_generate_random(uuid);
-		else
-			uuid_copy(uuid, dev->uuid);
-		uuid_unparse(dev->uuid, uuid_buf);
-		memset(short_uuid, 0, sizeof(short_uuid));
-		memcpy(short_uuid, uuid_buf, 8);
-		snprintf(label, DMZ_LABEL_LEN - 1,
-			 "dmz-%s", short_uuid);
-	}
-
-	if (check) {
-		/*
-		 * In the unlikely event that the label is used already,
-		 * fallback to using the first device name.
-		 */
-		snprintf(path, sizeof(path), "/dev/mapper/%s", label);
-		if (!lstat(path, &st)) {
-			fprintf(stderr,
-				"WARNING %s: label %s is already used, "
-				"relabelling to dmz-%s\n",
-				dev->bdev[0].name, label,
-				dev->bdev[0].name);
-			snprintf(label, DMZ_LABEL_LEN - 1,
-				 "dmz-%s", dev->bdev[0].name);
-		}
-	}
-}
-
 int dmz_start(struct dmz_dev *dev)
 {
 	/* Calculate metadata location */
@@ -415,7 +370,7 @@ int dmz_start(struct dmz_dev *dev)
 	}
 
 	/* Generate dm name */
-	dmz_set_label(dev, dev->label, true);
+	dmz_get_label(dev, dev->label, true);
 
 	if (dev->sb_version > 1) {
 		char dmz_uuid[UUID_STR_LEN];
