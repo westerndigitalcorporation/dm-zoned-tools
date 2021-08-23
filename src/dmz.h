@@ -396,6 +396,7 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 int dmz_reset_zones(struct dmz_dev *dev);
 int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
 int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
+void dmz_set_label(struct dmz_dev *dev, char *label, bool check);
 
 __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 

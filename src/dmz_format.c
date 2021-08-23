@@ -194,9 +194,6 @@ int dmz_format(struct dmz_dev *dev)
 		fprintf(stderr, "Defaulting to metadata version %d\n",
 			dev->sb_version);
 	}
-	if (dev->sb_version > 1 && !strlen(dev->label))
-		snprintf(dev->label, DMZ_LABEL_LEN - 1,
-			 "dmz-%s", dev->bdev[0].name);
 
 	/* calculate location of metadata blocks */
 	if (dmz_locate_metadata(dev) < 0)
@@ -212,6 +209,9 @@ int dmz_format(struct dmz_dev *dev)
 				uuid_generate_random(dev->bdev[i].uuid);
 		}
 	}
+
+	dmz_set_label(dev, dev->label, false);
+
 	if (dev->flags & DMZ_VERBOSE) {
 		unsigned int nr_data_zones;
 
