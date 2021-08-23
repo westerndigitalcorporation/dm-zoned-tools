@@ -58,9 +58,9 @@ int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
 	sb->nr_bitmap_blocks = __cpu_to_le32(dev->nr_bitmap_blocks);
 
 	if (dev->sb_version > 1) {
-		memcpy(sb->dmz_uuid, dev->uuid, 16);
-		memcpy(sb->dmz_label, dev->label, 32);
-		memcpy(sb->dev_uuid, bdev->uuid, 16);
+		memcpy(sb->dmz_uuid, dev->uuid, DMZ_UUID_LEN);
+		memcpy(sb->dmz_label, dev->label, DMZ_LABEL_LEN);
+		memcpy(sb->dev_uuid, bdev->uuid, DMZ_UUID_LEN);
 	}
 	crc = dmz_crc32(gen, sb, DMZ_BLOCK_SIZE);
 	sb->crc = __cpu_to_le32(crc);
@@ -195,7 +195,8 @@ int dmz_format(struct dmz_dev *dev)
 			dev->sb_version);
 	}
 	if (dev->sb_version > 1 && !strlen(dev->label))
-		sprintf(dev->label, "dmz-%s", dev->bdev[0].name);
+		snprintf(dev->label, DMZ_LABEL_LEN - 1,
+			 "dmz-%s", dev->bdev[0].name);
 
 	/* calculate location of metadata blocks */
 	if (dmz_locate_metadata(dev) < 0)

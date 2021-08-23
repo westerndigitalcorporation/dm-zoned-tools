@@ -54,6 +54,12 @@
 			 ((unsigned int)('D')))
 
 /*
+ * Maximum label and uuid length.
+ */
+#define DMZ_LABEL_LEN	32
+#define DMZ_UUID_LEN	16
+
+/*
  * On disk super block.
  * This uses a full 4KB block. This block is followed on disk
  * by the chunk mapping table to zones and the bitmap blocks
@@ -99,13 +105,13 @@ struct dm_zoned_super {
 
 	/* Fields added by Metadata version 2 */
 	/* DM-Zoned label */
-	__u8		dmz_label[32];		/*  80 */
+	__u8		dmz_label[DMZ_LABEL_LEN]; /*  80 */
 
 	/* DM-Zoned UUID */
-	__u8		dmz_uuid[16];		/*  96 */
+	__u8		dmz_uuid[DMZ_UUID_LEN];	/*  96 */
 
 	/* Device UUID */
-	__u8		dev_uuid[16];		/*  112 */
+	__u8		dev_uuid[DMZ_UUID_LEN];	/*  112 */
 
 	/* Padding to full 512B sector */
 	__u8		reserved[400];		/* 512 */
@@ -217,7 +223,7 @@ struct dmz_dev {
 	int		nr_bdev;
 	int		op;
 	unsigned int	flags;
-	char		label[32];
+	char		label[DMZ_LABEL_LEN];
 	uuid_t		uuid;
 
 	/* Device info */

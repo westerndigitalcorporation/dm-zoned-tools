@@ -184,9 +184,10 @@ int main(int argc, char **argv)
 				label++;
 				label_size -= 2;
 			}
-			if (label_size > 31) {
+			if (label_size > DMZ_LABEL_LEN - 1) {
 				fprintf(stderr,
-					"Label too long (max 16 characters)\n");
+					"Label too long (max %d characters)\n",
+					DMZ_LABEL_LEN - 1);
 				return 1;
 			}
 			memcpy(dev->label, label, label_size);

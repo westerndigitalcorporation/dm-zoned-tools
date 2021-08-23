@@ -796,8 +796,10 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 		}
 
 		if (!strlen(dev->label)) {
-			memcpy(dev->label, (const char *)sb->dmz_label, 32);
-		} else if (strncmp(dev->label, (const char *)sb->dmz_label, 32)) {
+			memcpy(dev->label, (const char *)sb->dmz_label,
+			       DMZ_LABEL_LEN);
+		} else if (strncmp(dev->label, (const char *)sb->dmz_label,
+				   DMZ_LABEL_LEN)) {
 			dmz_err(dev, 0,
 				"DM-Zoned label mismatch (expected %s, read %s)\n",
 				dev->label, sb->dmz_label);

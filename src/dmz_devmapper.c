@@ -327,7 +327,8 @@ static int dmz_load_sb(struct dmz_dev *dev)
 			goto out;
 		}
 		uuid_copy(dev->uuid, sb->dmz_uuid);
-		strncpy(dev->label, (const char *)sb->dmz_label, 32);
+		strncpy(dev->label, (const char *)sb->dmz_label,
+			DMZ_LABEL_LEN);
 		break;
 	case 1:
 		break;
