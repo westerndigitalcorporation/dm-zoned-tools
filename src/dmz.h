@@ -376,31 +376,31 @@ extern int dmz_mod_ver;
 #define dmz_zone_need_reset(z)	(int)(z)->reset
 #define dmz_zone_non_seq(z)	(int)(z)->non_seq
 
-extern unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block);
-extern struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
-					       __u64 block, __u64 *ret_block);
-extern struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
-						__u64 sector, __u64 *ret_sector);
-extern int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
-extern void dmz_close_dev(struct dmz_block_dev *dev);
-extern int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
-extern int dmz_sync_dev(struct dmz_block_dev *dev);
-extern int dmz_get_dev_zones(struct dmz_dev *dev);
-extern int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
-extern int dmz_reset_zones(struct dmz_dev *dev);
-extern int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
-extern int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
+unsigned int dmz_block_zone_id(struct dmz_dev *dev, __u64 block);
+struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
+					__u64 block, __u64 *ret_block);
+struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
+					 __u64 sector, __u64 *ret_sector);
+int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
+void dmz_close_dev(struct dmz_block_dev *dev);
+int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
+int dmz_sync_dev(struct dmz_block_dev *dev);
+int dmz_get_dev_zones(struct dmz_dev *dev);
+int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
+int dmz_reset_zones(struct dmz_dev *dev);
+int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
+int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf);
 
-extern __u32 dmz_crc32(__u32 crc, const void *address, size_t length);
+__u32 dmz_crc32(__u32 crc, const void *address, size_t length);
 
-extern int dmz_locate_metadata(struct dmz_dev *dev);
-extern int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
-extern int dmz_format(struct dmz_dev *dev);
-extern int dmz_check(struct dmz_dev *dev);
-extern int dmz_repair(struct dmz_dev *dev);
-extern int dmz_init_dm(int log_level);
-extern int dmz_start(struct dmz_dev *dev);
-extern int dmz_stop(struct dmz_dev *dev, char *dm_dev);
-extern int dmz_load_module(const char *modname, int log_level);
+int dmz_locate_metadata(struct dmz_dev *dev);
+int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset);
+int dmz_format(struct dmz_dev *dev);
+int dmz_check(struct dmz_dev *dev);
+int dmz_repair(struct dmz_dev *dev);
+int dmz_init_dm(int log_level);
+int dmz_start(struct dmz_dev *dev);
+int dmz_stop(struct dmz_dev *dev, char *dm_dev);
+int dmz_load_module(const char *modname, int log_level);
 
 #endif /* __DMZ_H__ */
