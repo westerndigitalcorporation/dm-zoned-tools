@@ -1188,9 +1188,11 @@ int dmz_check(struct dmz_dev *dev)
 	if (mset[0].flags == DMZ_MSET_VALID &&
 	    mset[1].flags == DMZ_MSET_VALID &&
 	    mset[2].flags == DMZ_MSET_VALID)
-		dmz_msg(dev, 0, "Done\n");
+		dmz_msg(dev, 0,
+			"No error detected\n");
 	else
-		dmz_msg(dev, 0, "Running repair is recommended\n");
+		dmz_msg(dev, 0,
+			"Errors detected: running repair is recommended\n");
 
 out:
 	free(mset[0].map_buf);
