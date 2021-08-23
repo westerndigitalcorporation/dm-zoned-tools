@@ -765,13 +765,17 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 
 	/* Check UUID for V2 metadata */
 	if (__le32_to_cpu(sb->version) > 1) {
-		struct dmz_block_dev *bdev;
+		__u64 bdev_sb_block;
+		struct dmz_block_dev *bdev =
+			dmz_block_to_bdev(dev, mset->sb_block, &bdev_sb_block);
 
+		/* Check UUID */
 		if (uuid_is_null(sb->dmz_uuid)) {
-			dmz_err(dev, 0,
-				"DM-Zoned UUID is null\n");
+			dmz_err(dev, 0, "DM-Zoned UUID is null\n");
 			goto err;
-		} else if (uuid_is_null(dev->uuid)) {
+		}
+
+		if (uuid_is_null(dev->uuid)) {
 			uuid_copy(dev->uuid, sb->dmz_uuid);
 		} else if (uuid_compare(sb->dmz_uuid, dev->uuid)) {
 			char dev_uuid_buf[UUID_STR_LEN];
@@ -784,11 +788,14 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 				dev_uuid_buf, sb_uuid_buf);
 			goto err;
 		}
+
+		/* Check label */
 		if (!strlen((const char *)sb->dmz_label)) {
-			dmz_err(dev, 0,
-				"DM-Zoned label is null\n");
+			dmz_err(dev, 0, "DM-Zoned label is null\n");
 			goto err;
-		} else if (!strlen(dev->label)) {
+		}
+
+		if (!strlen(dev->label)) {
 			memcpy(dev->label, (const char *)sb->dmz_label, 32);
 		} else if (strncmp(dev->label, (const char *)sb->dmz_label, 32)) {
 			dmz_err(dev, 0,
@@ -796,35 +803,16 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 				dev->label, sb->dmz_label);
 			goto err;
 		}
+
+		/* Check device UUID */
 		if (uuid_is_null(sb->dev_uuid)) {
 			dmz_err(dev, 0, "Device UUID is null\n");
 			goto err;
 		}
-		if (mset->id < 2) {
-			bdev = &dev->bdev[0];
 
-			if (uuid_is_null(bdev->uuid)) {
-				uuid_copy(bdev->uuid, sb->dev_uuid);
-			} else if (uuid_compare(bdev->uuid, sb->dev_uuid)) {
-				char dev_uuid_buf[UUID_STR_LEN];
-				char sb_uuid_buf[UUID_STR_LEN];
-
-				uuid_unparse(bdev->uuid, dev_uuid_buf);
-				uuid_unparse(sb->dmz_uuid, sb_uuid_buf);
-				dmz_err(dev, 0,
-					"Device UUID mismatch (expected %s, read %s)\n",
-					dev_uuid_buf, sb_uuid_buf);
-				goto err;
-			}
-		} else {
-			int i;
-
-			for (i = 1; i < dev->nr_bdev; i++) {
-				bdev = &dev->bdev[i];
-				uuid_copy(bdev->uuid, sb->dev_uuid);
-			}
-		}
+		uuid_copy(bdev->uuid, sb->dev_uuid);
 	}
+
 	/* Check location */
 	if (__le64_to_cpu(sb->sb_block) != mset->sb_block) {
 		dmz_err(dev, 0,

@@ -27,7 +27,7 @@
 #include <blkid/blkid.h>
 
 /*
- * Translate device to block
+ * Translate block number to device
  */
 struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 					__u64 block, __u64 *ret_block)
@@ -47,10 +47,10 @@ struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 }
 
 /*
- * Translate device to sector
+ * Translate sector to device
  */
-struct dmz_block_dev *
-dmz_sector_to_bdev(struct dmz_dev *dev, __u64 sector, __u64 *ret_sector)
+struct dmz_block_dev * dmz_sector_to_bdev(struct dmz_dev *dev,
+					  __u64 sector, __u64 *ret_sector)
 {
 	int i;
 
