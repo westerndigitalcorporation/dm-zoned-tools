@@ -176,12 +176,14 @@ a zoned block device for use with the dm-zoned
 device mapper.
 Usage: dmzadm <operation> <device(s)> [options]
 Operations
-  --help | -h	: General help message
-  --format	: Format a block device metadata
-  --check	: Check a block device metadata
-  --repair	: Repair a block device metadata
-  --start	: Start the device-mapper target
-  --stop	: Stop the device-mapper target
+  --version | -v : Print version number and exit
+  --help | -h	 : General help message
+  --format	 : Format a block device metadata
+  --check	 : Check a block device metadata
+  --repair	 : Repair a block device metadata
+  --relabel	 : Change the device label
+  --start	 : Start the device-mapper target
+  --stop	 : Stop the device-mapper target
 Devices
   For a single device target, a zoned block device
   must be specified. For a multi-device target, a
@@ -197,6 +199,8 @@ Format operation options
   --seq=<num>	: Number of sequential zones reserved
                   for reclaim. The minimum is 1 and the
                   default is 16
+Relabel operation options
+  --label=<str> : Set the target new label name to <str>
 ```
 
 ### Creating a Target Device
