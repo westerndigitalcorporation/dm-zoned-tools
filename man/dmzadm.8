@@ -8,132 +8,138 @@
 .TH dmzadm 8 "May 20 2020"
 .SH NAME
 dmzadm \- manage zoned block device format for use with the dm-zoned device
-mapper
+mapper target
 
 .SH SYNOPSIS
-.BI dmzadm " <operation> [regular-block-dev] <zoned-block-dev> [zoned-block-dev [...]] [options]"
+.B dmzadm
+.B \-h | \-\-help
+.sp
+.B dmzadm
+.B \-\-version
+.sp
+.B dmzadm
+.I operation
+[
+.I regular\-block\-device
+]
+.I zoned\-block\-device\-0
+[
+.I zoned\-block\-device\-1
+[...]
+]
+[
+.B options
+]
 
 .SH DESCRIPTION
-.B dmzadm
-is used to format, check and repair block devices used with the dm-zoned
-device mapper. 
-\fIzoned-block-dev\fP is the device node corresponding to the target zoned
-blocks device (e.g.
-\fI/dev/sdXX\fP).
-\fIregular-block-dev\fP is the optional device node corresponding to a
+
+\fBdmzadm\fR is used to format, check and repair block devices used with the
+dm-zoned device mapper. \fIzoned\-block\-device-0\fR specifies the device node
+of the zoned block device to use (e.g. \fI/dev/sdX\fR).
+
+\fIregular\-block\-device\fR is an optional device node corresponding to a
 regular block device to be used together with the zoned block device to store
 metadata and to act as the conventional zone storage space for the zoned
-devices. More than one zoned block device can be specified. If multiple zoned
-block device is specified, all devices must have the same zone size and a
-regular block device must also be specified.
-\fIoperation\fP specifies the action to be taken for the device.
-.PP
-The exit code returned by
-.B dmzadm
-is 0 on success and 1 on failure.
+device.
+
+When \fIregular\-block\-device\fR is used, more than one zoned block device can
+be specified (\fIzoned\-block\-device\-1\fR etc). If multiple zoned block devices
+are specified, all devices must have the same zone size.
+
+\fIoperation\fR specifies the action to be taken on the device.
+
+\fBdmzadm\fR returns 0 on success and 1 on failure.
 
 .SH OPERATIONS
 
-dmzadm allows the following operations.
+dmzadm defines the following operations.
 
 .TP
-.B Format
+.B \-h, \-\-help
+Print a short usage description of dmzadm.
+
+.TP
+.B --version
+Print the current version number and exit dmzadm.
+
+.TP
+.B \-\-format
 Write to the zoned block device(s) and optional regular block device dm-zoned
 metadata, whiping clean all data that was stored on the device(s).
 
 .TP
-.B Check
+.B \-\-check
 Check the device(s) metadata consistency. No repair action is taken.
-Errors are not corrected with this operation. For repairing incorrect metadata,
-the
-\fIRepair\fP operation must be used.
+Metadata corruptions are not corrected with this operation. For repairing
+incorrect metadata, the \fB\-\-repair\fR operation must be used.
 
 .TP
-.B Repair
+.B \-\-repair
 Check the consistency of the device(s) metadata and try to repair any error
 detected.
 
 .TP
-.B Start
-Load the metadata information from the device(s) and activate the dm-zoned
-target.
+.B \-\-relabel
+Change the label (DM device name) of a formatted dm-zoned device.
 
 .TP
-.B Stop
-Deactivate the dm-zoned target associated with the block device(s).
+.B \-\-start
+Load the metadata information from the block device(s) and activate the
+dm-zoned device.
 
 .TP
-.B Help
-Print a short usage description of dmzadm.
+.B \-\-stop
+Deactivate the dm-zoned device associated with the block device(s).
+
+.SH COMMON OPTIONS
+
+The following options can be used with all operations.
 
 .TP
-.B Version
-Print the current version number and exit dmzadm.
-
-.SH OPTIONS
-
-.TP
-Options for selecting an operation are:
-
-.TP
-.BR \-\-format
-Format the specified block device(s).
-
-.TP
-.BR \-\-check
-Check the specified block device(s) metadata.
-
-.TP
-.BR \-\-repair
-Check the block device(s) metadata and attempt to repair any error found.
-
-.TP
-.BR \-\-start
-Load block device(s) metadata and activate the device-mapper target.
-
-.TP
-.BR \-\-stop
-Deactivate the device-mapper target for a zoned block device.
-
-.TP
-.BR \-\-help ", " \-h
-Print usage help.
-
-.TP
-.BR \-\-version", " \-v
-Print current version number.
-
-.TP
-General options:
-
-.TP
-.BR \-\-verbose ", " \-v
+.B \-\-verbose
 Verbose output detailing actions taken.
 
 .TP
-.BR \-\-vverbose ", " \-vv
+.B \-\-vverbose
 Very detailed output of actions taken.
 
-.TP
-Format operation options:
+.SH FORMAT OPERATION OPTIONS
+
+The following options can be used when the \fB\-\-format\fR operation
+is specified.
 
 .TP
-.BR \-\-seq=<num>
+.B \-\-seq=\fInum\fR
 Specify the number of sequential zones to be reserved for reclaim
 (default: 16 per zoned block device).
 
 .TP
-.BR \-\-label=<str>
-Sets the name for the device-mapper device. Defaults to
-.I dmz-<devname>
-.
+.B \-\-label=\fIstr\fR
+Define the label of the device-mapper device. If not specified, the label
+defaults to \fIdmz\-serial\fR, where \fIserial\fR is the serial number of the
+block device storing the metadata (the first block device specified). If the
+serial number for the metadata block device is not available, the label
+defaults to \fIdmz\-bdevname\fR where \fIbdevname\fR is the name of the
+metadata block device.
 
-.SH AUTHOR
-This version of
-.B dmzadm
-has been written by Damien Le Moal <damien.lemoal@wdc.com>
-and Albert H. Chen <albert.chen@wdc.com> with contributions from
-Hannes Reinecke <hare@suse.de>.
+.SH RELABEL OPERATION OPTIONS
+
+The following options can be used when the \fB\-\-relabel\fR operation
+is specified.
+
+.TP
+.B \-\-label=\fIstr\fR
+Define the new label of the device-mapper device. If not specified, the new
+label defaults to \fIdmz\-serial\fR, where \fIserial\fR is the serial number
+of the block device storing the metadata (the first block device specified).
+If the serial number for the metadata block device is not available, the label
+defaults to \fIdmz\-bdevname\fR where \fIbdevname\fR is the name of the
+metadata block device.
+
+.SH AUTHORS
+This version of \fBdmzadm\fR was written by Damien Le Moal
+<damien.lemoal@wdc.com> and Albert H. Chen <albert.chen@wdc.com> with
+contributions from Hannes Reinecke <hare@suse.de>.
 
 .SH COPYRIGHT
 GNU General Public Licence version 3 or later
