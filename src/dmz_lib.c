@@ -125,8 +125,10 @@ static int dmz_reset_all_zones(struct dmz_dev *dev,
 		return ret;
 
 	for (i = 0; i < bdev->nr_zones; i++, zone++) {
-		if (dmz_zone_seq_req(zone) || dmz_zone_seq_pref(zone))
+		if (dmz_zone_seq_req(zone) || dmz_zone_seq_pref(zone)) {
 			zone->wp = zone->start;
+			zone->cond = BLK_ZONE_COND_EMPTY;
+		}
 	}
 
 	return bdev->nr_zones;
@@ -141,7 +143,7 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone)
 	struct blk_zone_range range;
 	__u64 zone_sector;
 
-	if (dmz_zone_unknown(zone) || dmz_zone_conv(zone))
+	if (!dmz_zone_seq_req(zone) && !dmz_zone_seq_pref(zone))
 		return 0;
 
 	bdev = dmz_sector_to_bdev(dev, dmz_zone_sector(zone), &zone_sector);
@@ -159,6 +161,7 @@ int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone)
 	}
 
 	zone->wp = zone->start;
+	zone->cond = BLK_ZONE_COND_EMPTY;
 
 	return 0;
 }
