@@ -27,7 +27,7 @@
 #include <blkid/blkid.h>
 
 /*
- * Translate block number to device
+ * Get the block device from a block number.
  */
 struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 					__u64 block, __u64 *ret_block)
@@ -36,34 +36,38 @@ struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 
 	for (i = dev->nr_bdev - 1; i >= 0; i--) {
 		if (block >= dev->bdev[i].block_offset) {
-			*ret_block = block - dev->bdev[i].block_offset;
+			if (ret_block)
+				*ret_block = block - dev->bdev[i].block_offset;
 			return &dev->bdev[i];
 		}
 	}
 
-	*ret_block = (__u64)-1;
+	if (ret_block)
+		*ret_block = (__u64)-1;
 
 	return NULL;
 }
 
 /*
- * Translate sector to device
+ * Get the block device from a sector number.
  */
-struct dmz_block_dev * dmz_sector_to_bdev(struct dmz_dev *dev,
-					  __u64 sector, __u64 *ret_sector)
+struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
+					 __u64 sector, __u64 *ret_sector)
 {
+	__u64 sector_offset;
 	int i;
 
 	for (i = dev->nr_bdev - 1; i >= 0; i--) {
-		__u64 sector_offset =
-			dmz_blk2sect(dev->bdev[i].block_offset);
+		sector_offset = dmz_blk2sect(dev->bdev[i].block_offset);
 		if (sector >= sector_offset) {
-			*ret_sector = sector - sector_offset;
+			if (ret_sector)
+				*ret_sector = sector - sector_offset;
 			return &dev->bdev[i];
 		}
 	}
 
-	*ret_sector = (__u64)-1;
+	if (ret_sector)
+		*ret_sector = (__u64)-1;
 
 	return NULL;
 }
