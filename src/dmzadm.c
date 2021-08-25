@@ -265,7 +265,9 @@ int main(int argc, char **argv)
 	}
 
 	/* Open the device */
-	if (dmz_open_bdev(&dev->bdev[0], op, dev->flags) < 0)
+	ret = dmz_open_bdev(&dev->bdev[0], op,
+			    dev->flags | DMZ_METADATA_BDEV);
+	if (ret)
 		return 1;
 
 	if (dev->nr_bdev > 1) {

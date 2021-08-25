@@ -19,6 +19,27 @@
 #include <asm/byteorder.h>
 
 /*
+ * Prepare the zone containing a super block.
+ */
+static int dmz_prepare_super_zone(struct dmz_dev *dev, __u64 sb_block)
+{
+	unsigned int zone_id = dmz_block_zone_id(dev, sb_block);
+	struct blk_zone *zone = &dev->zones[zone_id];
+
+	/*
+	 * For conventional and empty zones, we have nothing to do.
+	 * For non-empty seuential zones, reset the zone so that overwrites
+	 * of the super block by the relabel or repair operations does not fail.
+	 */
+	if (dmz_zone_unknown(zone) ||
+	    dmz_zone_conv(zone) ||
+	    dmz_zone_empty(zone))
+		return 0;
+
+	return dmz_reset_zone(dev, zone);
+}
+
+/*
  * Fill and write a super block.
  */
 int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
@@ -29,6 +50,9 @@ int dmz_write_super(struct dmz_dev *dev, __u64 gen, __u64 offset)
 	__u32 crc;
 	__u8 *buf;
 	int ret;
+
+	if (dmz_prepare_super_zone(dev, sb_block))
+		return -1;
 
 	buf = malloc(DMZ_BLOCK_SIZE);
 	if (!buf) {

@@ -582,10 +582,12 @@ out:
  */
 int dmz_open_bdev(struct dmz_block_dev *bdev, enum dmz_op op, int flags)
 {
+	int open_flags = O_RDWR | O_LARGEFILE;
 	struct stat st;
 	int ret;
 
 	bdev->name = basename(bdev->path);
+	bdev->direct_io = false;
 
 	/* Check that this is a block device */
 	if (stat(bdev->path, &st) < 0) {
@@ -603,11 +605,35 @@ int dmz_open_bdev(struct dmz_block_dev *bdev, enum dmz_op op, int flags)
 		return -1;
 	}
 
-	if (op == DMZ_OP_FORMAT && (!(flags & DMZ_OVERWRITE))) {
-		/* Check for existing valid content */
-		ret = dmz_check_overwrite(bdev);
-		if (ret <= 0)
-			return -1;
+	switch (op) {
+	case DMZ_OP_FORMAT:
+		if (!(flags & DMZ_OVERWRITE)) {
+			/* Check for existing valid content */
+			ret = dmz_check_overwrite(bdev);
+			if (ret <= 0)
+				return -1;
+		}
+		/* fallthrough */
+	case DMZ_OP_REPAIR:
+	case DMZ_OP_RELABEL:
+		/*
+		  * For block devices other than the first block device
+		  * storing the metadata, we may not have conventional zones.
+		  * Writing the super block in this case is safer with direct
+		  * IOs.
+		  */
+		if (!(flags & DMZ_METADATA_BDEV)) {
+			open_flags |= O_DIRECT;
+			bdev->direct_io = true;
+		}
+		break;
+	case DMZ_OP_CHECK:
+	case DMZ_OP_START:
+	case DMZ_OP_STOP:
+		break;
+	default:
+		fprintf(stderr, "Invalid operation\n");
+		return -1;
 	}
 
 	if (dmz_bdev_mounted(bdev)) {
@@ -625,7 +651,7 @@ int dmz_open_bdev(struct dmz_block_dev *bdev, enum dmz_op op, int flags)
 	}
 
 	/* Open device */
-	bdev->fd = open(bdev->path, O_RDWR | O_LARGEFILE);
+	bdev->fd = open(bdev->path, open_flags);
 	if (bdev->fd < 0) {
 		fprintf(stderr,
 			"Open %s failed %d (%s)\n",
@@ -693,6 +719,19 @@ void dmz_close_bdev(struct dmz_block_dev *bdev)
 }
 
 /*
+ * Allocate a page aligned buffer suitable for direct IOs.
+ */
+static __u8 *dmz_malloc_buf(size_t size)
+{
+	void *buf;
+
+	if (posix_memalign(&buf, sysconf(_SC_PAGESIZE), size))
+		return NULL;
+
+	return buf;
+}
+
+/*
  * Read a metadata block.
  */
 int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
@@ -701,8 +740,16 @@ int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 	struct dmz_block_dev *bdev =
 		dmz_block_to_bdev(dev, block, &read_block);
 	ssize_t ret;
+	__u8 *rdbuf = buf;
 
-	ret = pread(bdev->fd, (char *)buf, DMZ_BLOCK_SIZE,
+	if (bdev->direct_io) {
+		/* bounce buffer */
+		rdbuf = dmz_malloc_buf(DMZ_BLOCK_SIZE);
+		if (!rdbuf)
+			return -1;
+	}
+
+	ret = pread(bdev->fd, (char *)rdbuf, DMZ_BLOCK_SIZE,
 		    read_block << DMZ_BLOCK_SHIFT);
 
 	if (ret != DMZ_BLOCK_SIZE) {
@@ -711,7 +758,14 @@ int dmz_read_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 			bdev->name,
 			read_block,
 			errno, strerror(errno));
+		if (bdev->direct_io)
+			free(rdbuf);
 		return -1;
+	}
+
+	if (bdev->direct_io) {
+		memcpy(buf, rdbuf, DMZ_BLOCK_SIZE);
+		free(rdbuf);
 	}
 
 	return 0;
@@ -726,9 +780,22 @@ int dmz_write_block(struct dmz_dev *dev, __u64 block, __u8 *buf)
 	struct dmz_block_dev *bdev =
 		dmz_block_to_bdev(dev, block, &write_block);
 	ssize_t ret;
+	__u8 *wrbuf = buf;
 
-	ret = pwrite(bdev->fd, (char *)buf, DMZ_BLOCK_SIZE,
+	if (bdev->direct_io) {
+		/* bounce buffer */
+		wrbuf = dmz_malloc_buf(DMZ_BLOCK_SIZE);
+		if (!wrbuf)
+			return -1;
+		memcpy(wrbuf, buf, DMZ_BLOCK_SIZE);
+	}
+
+	ret = pwrite(bdev->fd, (char *)wrbuf, DMZ_BLOCK_SIZE,
 		     write_block << DMZ_BLOCK_SHIFT);
+
+	if (bdev->direct_io)
+		free(wrbuf);
+
 	if (ret != DMZ_BLOCK_SIZE) {
 		fprintf(stderr,
 			"%s: Write block %llu failed %d (%s)\n",

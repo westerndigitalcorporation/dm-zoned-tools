@@ -178,7 +178,7 @@ enum dmz_dev_type {
 #define DMZ_VVERBOSE		0x00000002
 #define DMZ_REPAIR		0x00000004
 #define DMZ_OVERWRITE		0x00000008
-#define DMZ_CACHE		0x00000010
+#define DMZ_METADATA_BDEV	0x00000010
 
 /*
  * Operations.
@@ -201,6 +201,7 @@ struct dmz_block_dev {
 	char		*serial;
 
 	enum dmz_dev_type type;
+	bool		direct_io;
 
 	uuid_t		uuid;
 	__u64		capacity;
