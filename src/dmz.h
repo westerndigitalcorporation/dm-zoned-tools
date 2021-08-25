@@ -390,6 +390,11 @@ struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 					__u64 block, __u64 *ret_block);
 struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
 					 __u64 sector, __u64 *ret_sector);
+static inline struct dmz_block_dev *dmz_zone_to_bdev(struct dmz_dev *dev,
+						     struct blk_zone *zone)
+{
+	return dmz_sector_to_bdev(dev, zone->start, NULL);
+}
 
 int dmz_open_bdev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
 void dmz_close_bdev(struct dmz_block_dev *dev);

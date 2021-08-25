@@ -618,10 +618,12 @@ static unsigned int dmz_get_zone_mapping(struct dmz_dev *dev,
 static int dmz_check_bitmaps(struct dmz_dev *dev,
 			     struct dmz_meta_set *mset)
 {
+	struct dmz_block_dev *bdev;
 	struct blk_zone *zone;
 	unsigned int chunk, bzone_id;
 	unsigned int i, unmapped_zones = 0;
 	unsigned int mapped_zones = 0;
+	__u64 block = 0;
 	int ind = 2;
 	int ret;
 
@@ -639,6 +641,16 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 	for (i = 0; i < dev->nr_zones; i++) {
 
 		zone = &dev->zones[i];
+		bdev = dmz_zone_to_bdev(dev, zone);
+
+		/*
+		 * Skip the first zone of secoundary block devices as they
+		 * only store the device super block.
+		 */
+		if (bdev->block_offset && block == bdev->block_offset) {
+			block += dev->zone_nr_blocks;
+			continue;
+		}
 
 		chunk = dmz_get_zone_mapping(dev, mset, zone, &bzone_id);
 
@@ -655,6 +667,7 @@ static int dmz_check_bitmaps(struct dmz_dev *dev,
 			mapped_zones++;
 		}
 
+		block += dev->zone_nr_blocks;
 	}
 
 	if (mset->error_count == 0) {
@@ -731,9 +744,10 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 	/* Read block */
 	ret = dmz_read_block(dev, mset->sb_block, mset->buf);
 	if (ret != 0) {
-		/* Need a new line to end previous print out */
-		dmz_msg(dev, 0, "\n");
-		goto err;
+		fprintf(stderr,
+			"Read superblock %llu failed\n",
+			mset->sb_block);
+		return -1;
 	}
 
 	/* Check magic */
@@ -891,6 +905,8 @@ static int dmz_check_sb(struct dmz_dev *dev, struct dmz_meta_set *mset)
 
 err:
 	mset->total_error_count++;
+	mset->flags &= ~DMZ_MSET_SB_VALID;
+
 	return 0;
 }
 
@@ -1025,7 +1041,7 @@ static int dmz_check_superblocks(struct dmz_dev *dev,
 
 static int dmz_check_tertiary_superblocks(struct dmz_dev *dev)
 {
-	int i, ret;
+	int i;
 
 	for (i = 1; i < dev->nr_bdev; i++) {
 		struct dmz_meta_set mset;
@@ -1036,11 +1052,11 @@ static int dmz_check_tertiary_superblocks(struct dmz_dev *dev)
 		dmz_msg(dev, 2,
 			"Tertiary superblock at block %llu (zone %u)\n",
 			mset.sb_block, dmz_block_zone_id(dev, mset.sb_block));
-		ret = dmz_check_sb(dev, &mset);
-		if (ret)
-			break;
+		if (dmz_check_sb(dev, &mset))
+			return -1;
 	}
-	return ret;
+
+	return 0;
 }
 
 /*
