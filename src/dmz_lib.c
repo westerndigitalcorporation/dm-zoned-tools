@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
+#include <libudev.h>
+
 /*
  * For super block checksum (CRC32)
  */
@@ -337,3 +339,75 @@ int dmz_locate_metadata(struct dmz_dev *dev)
 	return 0;
 }
 
+/*
+ * Get a block device serial number.
+ */
+static char *dmz_get_bdev_serial(struct dmz_block_dev *bdev)
+{
+	static struct udev *udev;
+	struct udev_device *dev;
+	const char *data;
+
+        if (!udev)
+                udev = udev_new();
+        if (!udev)
+		return NULL;
+
+	dev = udev_device_new_from_subsystem_sysname(udev, "block", bdev->name);
+        if (!dev)
+		return NULL;
+
+	data = udev_device_get_property_value(dev, "ID_SERIAL_SHORT");
+	if (!data)
+		data = udev_device_get_property_value(dev, "ID_SERIAL");
+	if (!data)
+		data = udev_device_get_property_value(dev, "ID_SCSI_SERIAL");
+	if (!data)
+		data = udev_device_get_property_value(dev, "SCSI_IDENT_SERIAL");
+	if (!data)
+		return NULL;
+
+	return strdup(data);
+}
+
+/*
+ * Generate a unique label from the metadata block device serial number.
+ * Fallback to using the device name if the serial cannot be obtained.
+ */
+void dmz_get_label(struct dmz_dev *dev, char *label, bool check)
+{
+	struct dmz_block_dev *bdev = &dev->bdev[0];
+	char path[128];
+	struct stat st;
+
+	/*
+	 * If the user did not specify a label, generate one from a random
+	 * UUID (meta ver 1) or from the dm-zoned UUID (meta ver 2).
+	 */
+	if (!strlen(label)) {
+		bdev->serial = dmz_get_bdev_serial(bdev);
+		if (bdev->serial)
+			snprintf(label, DMZ_LABEL_LEN - 1,
+				 "dmz-%s", bdev->serial);
+		else
+			snprintf(label, DMZ_LABEL_LEN - 1,
+				 "dmz-%s", bdev->name);
+	}
+
+	if (check) {
+		/*
+		 * In the unlikely event that the label is used already,
+		 * fallback to using the first device name.
+		 */
+		snprintf(path, sizeof(path), "/dev/mapper/%s", label);
+		if (!lstat(path, &st)) {
+			fprintf(stderr,
+				"WARNING %s: label %s is already used, "
+				"relabelling to dmz-%s\n",
+				dev->bdev[0].name, label,
+				dev->bdev[0].name);
+			snprintf(label, DMZ_LABEL_LEN - 1,
+				 "dmz-%s", dev->bdev[0].name);
+		}
+	}
+}
