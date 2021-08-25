@@ -390,10 +390,12 @@ struct dmz_block_dev *dmz_block_to_bdev(struct dmz_dev *dev,
 					__u64 block, __u64 *ret_block);
 struct dmz_block_dev *dmz_sector_to_bdev(struct dmz_dev *dev,
 					 __u64 sector, __u64 *ret_sector);
-int dmz_open_dev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
-void dmz_close_dev(struct dmz_block_dev *dev);
-int dmz_get_dev_holder(struct dmz_block_dev *dev, char *holder);
-int dmz_sync_dev(struct dmz_block_dev *dev);
+
+int dmz_open_bdev(struct dmz_block_dev *dev, enum dmz_op op, int flags);
+void dmz_close_bdev(struct dmz_block_dev *dev);
+int dmz_get_bdev_holder(struct dmz_block_dev *dev, char *holder);
+
+int dmz_sync_dev(struct dmz_dev *dev);
 int dmz_get_dev_zones(struct dmz_dev *dev);
 int dmz_reset_zone(struct dmz_dev *dev, struct blk_zone *zone);
 int dmz_reset_zones(struct dmz_dev *dev);

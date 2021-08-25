@@ -254,7 +254,7 @@ int main(int argc, char **argv)
 	if (op == DMZ_OP_STOP) {
 		char holder[PATH_MAX];
 
-		if (dmz_get_dev_holder(&dev->bdev[0], holder) < 0)
+		if (dmz_get_bdev_holder(&dev->bdev[0], holder) < 0)
 			return 1;
 		if (!strlen(holder)) {
 			fprintf(stderr, "%s: no dm-zoned device found\n",
@@ -265,14 +265,15 @@ int main(int argc, char **argv)
 	}
 
 	/* Open the device */
-	if (dmz_open_dev(&dev->bdev[0], op, dev->flags) < 0)
+	if (dmz_open_bdev(&dev->bdev[0], op, dev->flags) < 0)
 		return 1;
+
 	if (dev->nr_bdev > 1) {
 		if (dmz_bdev_is_zoned(&dev->bdev[0])) {
 			fprintf(stderr,
 				"%s: Not a regular block device\n",
 				dev->bdev[0].name);
-			dmz_close_dev(&dev->bdev[0]);
+			dmz_close_bdev(&dev->bdev[0]);
 			return 1;
 		}
 	} else {
@@ -280,7 +281,7 @@ int main(int argc, char **argv)
 			fprintf(stderr,
 				"%s: Not a zoned block device\n",
 				dev->bdev[0].name);
-			dmz_close_dev(&dev->bdev[0]);
+			dmz_close_bdev(&dev->bdev[0]);
 			return 1;
 		}
 		dev->zone_nr_sectors = dev->bdev[0].zone_nr_sectors;
@@ -289,8 +290,9 @@ int main(int argc, char **argv)
 	dev->capacity = dev->bdev[0].capacity;
 
 	for (i = 1; i < dev->nr_bdev; i++) {
-		if (dmz_open_dev(&dev->bdev[i], op, dev->flags) < 0)
+		if (dmz_open_bdev(&dev->bdev[i], op, dev->flags) < 0)
 			return 1;
+
 		if (!dmz_bdev_is_zoned(&dev->bdev[i])) {
 			fprintf(stderr,
 				"%s: Not a zoned block device\n",
@@ -298,6 +300,7 @@ int main(int argc, char **argv)
 			ret = 1;
 			goto out_close;
 		}
+
 		dev->capacity += dev->bdev[i].capacity;
 		if (dev->zone_nr_sectors &&
 		    dev->zone_nr_sectors != dev->bdev[i].zone_nr_sectors) {
@@ -310,6 +313,7 @@ int main(int argc, char **argv)
 			goto out_close;
 		} else
 			dev->zone_nr_sectors = dev->bdev[i].zone_nr_sectors;
+
 		if (dev->zone_nr_blocks &&
 		    dev->zone_nr_blocks != dev->bdev[i].zone_nr_blocks) {
 			fprintf(stderr,
@@ -319,9 +323,11 @@ int main(int argc, char **argv)
 				dev->bdev[i].zone_nr_blocks);
 			ret = 1;
 			goto out_close;
-		} else
+		} else {
 			dev->zone_nr_blocks = dev->bdev[i].zone_nr_blocks;
+		}
 	}
+
 	if (dev->nr_bdev > 1) {
 		__u64 block_offset = 0;
 
@@ -393,9 +399,10 @@ int main(int argc, char **argv)
 
 	free(dev->zones);
 	dev->zones = NULL;
+
 out_close:
 	for (i = 0; i < dev->nr_bdev; i++)
-		dmz_close_dev(&dev->bdev[i]);
+		dmz_close_bdev(&dev->bdev[i]);
 	free(dev->bdev);
 	free(dev);
 	return ret;

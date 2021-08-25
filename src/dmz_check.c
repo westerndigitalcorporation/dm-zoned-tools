@@ -1255,7 +1255,7 @@ int dmz_repair(struct dmz_dev *dev)
 {
 	struct dmz_meta_set mset[3];
 	struct dmz_meta_set *check_mset = NULL;
-	int id, ret, i;
+	int id, ret;
 
 	/* Init */
 	memset(mset, 0, sizeof(struct dmz_meta_set) * 3);
@@ -1315,13 +1315,7 @@ int dmz_repair(struct dmz_dev *dev)
 		return -1;
 	}
 
-	/* Sync device */
-	for (i = 0; i < dev->nr_bdev; i++) {
-		if (dmz_sync_dev(&dev->bdev[i]) < 0)
-			return -1;
-	}
-
-	return 0;
+	return dmz_sync_dev(dev);
 }
 
 /*
@@ -1394,11 +1388,8 @@ int dmz_relabel(struct dmz_dev *dev)
 		}
 	}
 
-	/* Sync devices */
-	for (i = 0; i < dev->nr_bdev; i++) {
-		if (dmz_sync_dev(&dev->bdev[i]) < 0)
-			return -1;
-	}
+	if (dmz_sync_dev(dev))
+		return -1;
 
 	return 0;
 

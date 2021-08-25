@@ -293,11 +293,8 @@ int dmz_format(struct dmz_dev *dev)
 		}
 	}
 
-	/* Sync */
-	for (i = 0; i < dev->nr_bdev; i++) {
-		if (dmz_sync_dev(&dev->bdev[i]) < 0)
-			return -1;
-	}
+	if (dmz_sync_dev(dev))
+		return -1;
 
 	printf("Done.\n");
 
