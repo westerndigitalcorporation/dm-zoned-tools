@@ -30,18 +30,8 @@ AC_CHECK_HEADER(mntent.h, [],
 		[AC_MSG_ERROR([Couldn't find mntent.h])])
 AC_CHECK_HEADER(linux/fs.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/fs.h])])
-AC_CHECK_HEADER(blkid/blkid.h, [],
-		[AC_MSG_ERROR([Couldn't find blkid/blkid.h])])
 AC_CHECK_HEADER(linux/blkzoned.h, [],
 		[AC_MSG_ERROR([Couldn't find linux/blkzoned.h])])
-AC_CHECK_HEADER(uuid/uuid.h, [],
-		[AC_MSG_ERROR([Couldn't find uuid/uuid.h])])
-AC_CHECK_HEADER(libdevmapper.h, [],
-		[AC_MSG_ERROR([Couldn't find libdevmapper.h])])
-AC_CHECK_HEADER(libkmod.h, [],
-		[AC_MSG_ERROR([Couldn't find libkmod.h])])
-AC_CHECK_HEADER(libudev.h, [],
-		[AC_MSG_ERROR([Couldn't find libudev.h (install systemd-devel)])])
 
 AC_CHECK_MEMBER([struct blk_zone.capacity],
 		[AC_DEFINE(HAVE_BLK_ZONE_REP_V2, [1],
@@ -49,20 +39,11 @@ AC_CHECK_MEMBER([struct blk_zone.capacity],
 		[], [[#include <linux/blkzoned.h>]])
 
 # Checks for libraries.
-AC_SEARCH_LIBS([blkid_do_fullprobe], [blkid], [],
-	       [AC_MSG_ERROR([Couldn't find libblkid])])
-
-AC_SEARCH_LIBS([uuid_generate_random], [uuid], [],
-		[AC_MSG_ERROR([Couldn't find libuuid])])
-
-AC_SEARCH_LIBS([dm_task_run], [devmapper], [],
-		[AC_MSG_ERROR([Couldn't find libdevmapper])])
-
-AC_SEARCH_LIBS([kmod_module_ref], [kmod], [],
-		[AC_MSG_ERROR([Couldn't find libkmod])])
-
-AC_SEARCH_LIBS([udev_new], [udev], [],
-		[AC_MSG_ERROR([Couldn't find libudev])])
+PKG_CHECK_MODULES([blkid], [blkid])
+PKG_CHECK_MODULES([kmod], [libkmod])
+PKG_CHECK_MODULES([libudev], [libudev])
+PKG_CHECK_MODULES([uuid], [uuid])
+PKG_CHECK_MODULES([devmapper], [devmapper])
 
 # Checks for rpm package builds
 AC_PATH_PROG([RPMBUILD], [rpmbuild], [notfound])

@@ -7,11 +7,11 @@ License:	GPLv3+
 URL:		https://github.com/westerndigitalcorporation/%{name}
 Source0:	%{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
-BuildRequires:	device-mapper-devel
-BuildRequires:	kmod-devel
-BuildRequires:	libuuid-devel
-BuildRequires:	libblkid-devel
-BuildRequires:	systemd-devel
+BuildRequires:	pkgconfig(devmapper)
+BuildRequires:	pkgconfig(libkmod)
+BuildRequires:	pkgconfig(uuid)
+BuildRequires:	pkgconfig(blkid)
+BuildRequires:	pkgconfig(libudev)
 BuildRequires:	autoconf
 BuildRequires:	autoconf-archive
 BuildRequires:	automake
