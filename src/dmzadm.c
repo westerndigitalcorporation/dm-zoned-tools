@@ -153,8 +153,14 @@ int main(int argc, char **argv)
 	for (i = 0; i < dev->nr_bdev; i++) {
 		dev->bdev[i].path = realpath(argv[i + 2], NULL);
 		if (!dev->bdev[i].path) {
-			fprintf(stderr, "Get device %s real path failed\n",
-				argv[i + 2]);
+			if (errno == ENOENT)
+				fprintf(stderr,
+					"%s: Device not found\n",
+					argv[i + 2]);
+			else
+				fprintf(stderr,
+					"Get device %s real path failed\n",
+					argv[i + 2]);
 			return 1;
 		}
 	}
