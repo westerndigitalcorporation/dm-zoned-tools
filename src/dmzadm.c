@@ -125,12 +125,13 @@ int main(int argc, char **argv)
 		dmzadm_usage();
 		return 1;
 	}
+
+	/* Initialize */
 	dev = malloc(sizeof(struct dmz_dev));
 	if (!dev) {
 		fprintf(stderr, "Cannot allocate device memory\n");
 		return 1;
 	}
-	/* Initialize */
 	memset(dev, 0, sizeof(struct dmz_dev));
 	dev->nr_reserved_seq = DMZ_NR_RESERVED_SEQ;
 	dev->sb_version = DMZ_META_VER;
@@ -143,6 +144,11 @@ int main(int argc, char **argv)
 		optnum++;
 	}
 	dev->nr_bdev = optnum - 2;
+	if (!dev->nr_bdev) {
+		fprintf(stderr, "No device specified\n");
+		return 1;
+	}
+
 	dev->bdev = malloc(sizeof(struct dmz_block_dev) * dev->nr_bdev);
 	for (i = 0; i < dev->nr_bdev; i++) {
 		dev->bdev[i].path = realpath(argv[i + 2], NULL);
