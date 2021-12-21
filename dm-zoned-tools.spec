@@ -1,5 +1,5 @@
 Name:		dm-zoned-tools
-Version:	2.2.0
+Version:	2.2.1
 Release:	1%{?dist}
 Summary:	Provides utilities to format, check and repair Linux dm-zoned devices
 
@@ -43,6 +43,8 @@ sh autogen.sh
 %doc README.md CONTRIBUTING
 
 %changelog
+* Tue Dec 21 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.2.1-1
+- Version 2.2.1 package
 * Wed Sep 01 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.2.0-1
 - Add "systemd-devel" as a build dependency
 - Version 2.2.0 package
