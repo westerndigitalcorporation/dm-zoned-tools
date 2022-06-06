@@ -5,7 +5,7 @@
 AC_INIT([dm-zoned-tools], [2.2.1], [damien.lemoal@wdc.com])
 
 AC_PREFIX_DEFAULT(/usr)
-AC_CONFIG_HEADER([src/config.h])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([-Wall foreign subdir-objects])
@@ -13,7 +13,6 @@ AM_SILENT_RULES([yes])
 
 AC_USE_SYSTEM_EXTENSIONS
 AC_SYS_LARGEFILE
-AC_GNU_SOURCE
 
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 m4_pattern_allow([AM_PROG_AR])

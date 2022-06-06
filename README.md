@@ -70,8 +70,8 @@ See the file [LICENSES/CC0-1.0.txt] for the full text of this license.
 
 The following packages must be installed prior to compiling.
 
+* m4
 * autoconf
-* autoconf-archive
 * automake
 * libtool
 * libuuid library and its development headers (*libuuid* and *libuuid-devel*
