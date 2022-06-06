@@ -13,7 +13,6 @@ BuildRequires:	pkgconfig(uuid)
 BuildRequires:	pkgconfig(blkid)
 BuildRequires:	pkgconfig(libudev)
 BuildRequires:	autoconf
-BuildRequires:	autoconf-archive
 BuildRequires:	automake
 BuildRequires:	libtool
 BuildRequires:	make
