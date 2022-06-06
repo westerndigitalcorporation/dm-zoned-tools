@@ -38,11 +38,16 @@ AC_CHECK_MEMBER([struct blk_zone.capacity],
 		[], [[#include <linux/blkzoned.h>]])
 
 # Checks for libraries.
-PKG_CHECK_MODULES([blkid], [blkid])
-PKG_CHECK_MODULES([kmod], [libkmod])
-PKG_CHECK_MODULES([libudev], [libudev])
-PKG_CHECK_MODULES([uuid], [uuid])
-PKG_CHECK_MODULES([devmapper], [devmapper])
+PKG_CHECK_MODULES([blkid], [blkid],
+		  [], [AC_MSG_ERROR([Could not find libblkid])])
+PKG_CHECK_MODULES([kmod], [libkmod],
+		  [], [AC_MSG_ERROR([Could not find libkmod])])
+PKG_CHECK_MODULES([libudev], [libudev],
+		  [], [AC_MSG_ERROR([Could not find libudev])])
+PKG_CHECK_MODULES([uuid], [uuid],
+		  [], [AC_MSG_ERROR([Could not find libuuid])])
+PKG_CHECK_MODULES([devmapper], [devmapper],
+		  [], [AC_MSG_ERROR([Could not find libdevmapper])])
 
 # Checks for rpm package builds
 AC_PATH_PROG([RPMBUILD], [rpmbuild], [notfound])
