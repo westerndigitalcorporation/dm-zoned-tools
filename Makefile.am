@@ -28,3 +28,5 @@ rpm:
 	exit 1
 endif
 
+CLEANFILES = *.rpm *.tar.gz
+DISTCLEANFILES = *.rpm *.tar.gz configure configure~
