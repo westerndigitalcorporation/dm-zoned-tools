@@ -1,5 +1,5 @@
 Name:		dm-zoned-tools
-Version:	2.2.1
+Version:	2.2.2
 Release:	1%{?dist}
 Summary:	Provides utilities to format, check and repair Linux dm-zoned devices
 
@@ -42,6 +42,8 @@ sh autogen.sh
 %doc README.md CONTRIBUTING
 
 %changelog
+* Tue Jan 31 2023 Damien Le Moal <damien.lemoal@wdc.com> 2.2.2-1
+- Version 2.2.2 package
 * Tue Dec 21 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.2.1-1
 - Version 2.2.1 package
 * Wed Sep 01 2021 Damien Le Moal <damien.lemoal@wdc.com> 2.2.0-1
