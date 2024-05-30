@@ -1,5 +1,5 @@
-Name:		dm-zoned-tools
-Version:	2.2.2
+Name:		%{pkg_name}
+Version:	%{pkg_version}
 Release:	1%{?dist}
 Summary:	Provides utilities to format, check and repair Linux dm-zoned devices
 
