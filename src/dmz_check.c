@@ -509,9 +509,18 @@ static int dmz_check_mapped_zone_bitmap(struct dmz_dev *dev,
 	if (ret != 0)
 		return -1;
 
-	/* No valid block should be present after the write pointer */
+	/*
+	 * No valid block should be present after the write pointer.
+	 * Conventional zones have no write pointer (the kernel reports -1):
+	 * every block may be valid. With more than one device,
+	 * dmz_zone_is_cache() only matches the cache device's zones, so the
+	 * zoned device's conventional zones reach this point.
+	 */
 	bad_bits = 0;
-	wp_block = dmz_sect2blk(zone->wp - zone->start);
+	if (dmz_zone_conv(zone) || dmz_zone_unknown(zone))
+		wp_block = dev->zone_nr_blocks;
+	else
+		wp_block = dmz_sect2blk(zone->wp - zone->start);
 	for (b = 0; b < wp_block; b++) {
 		if (dmz_test_bit(dbuf, b))
 			dzone_weight++;
